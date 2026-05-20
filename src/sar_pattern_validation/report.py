@@ -252,7 +252,6 @@ def _render_test_case_body(
             r"$sSAR_{en}(x_e,y_e)$, compared to the reference, "
             r"$sSAR_{rn}(x'_r,y'_r)$,"
         )
-
     subsection_title = (
         f"{antenna_type.capitalize()}, {frequency_mhz}\\,MHz, "
         f"{distance_mm}\\,mm, {mass_g}\\,g"

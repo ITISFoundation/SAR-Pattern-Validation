@@ -222,6 +222,22 @@ def _complete_workflow(config: WorkflowConfig) -> WorkflowResult:
 
         reference_db, measured_db = loader.get_images()
 
+        # Back-fill measurement area from actual loaded data when auto (None).
+        if config.measurement_area_x_mm is None:
+            config.measurement_area_x_mm = (
+                float(
+                    loader._measured_axes_m[0].max() - loader._measured_axes_m[0].min()
+                )
+                * 1000.0
+            )
+        if config.measurement_area_y_mm is None:
+            config.measurement_area_y_mm = (
+                float(
+                    loader._measured_axes_m[1].max() - loader._measured_axes_m[1].min()
+                )
+                * 1000.0
+            )
+
         # Auto-center plot window on the measured data centroid only when the
         # caller left window_mm at its default value (no explicit override).
         _cx_mm = float(loader._measured_axes_m[0].mean()) * 1000.0

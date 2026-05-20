@@ -121,6 +121,7 @@ def test_generate_report_writes_filled_tex_with_all_substitutions(tmp_path: Path
     assert r"\end{appendix}" in text
     # Check pass rate conditional: 97.5 < 100 so it should say Fail
     assert r"\textbf{Fail}" in text
+    assert "pattern validation fails" in text
 
 
 def test_generate_report_copies_existing_figures_with_template_filenames(
@@ -312,6 +313,11 @@ def test_generate_report_appends_multiple_cases(tmp_path: Path):
     # Both subsection titles should be present
     assert r"Dipole, 900\,MHz, 15\,mm, 10\,g" in text
     assert r"Patch, 2450\,MHz, 10\,mm, 10\,g" in text
+    # Both case titles should also be present via antenna/freq
+    assert "dipole" in text
+    assert "patch" in text
+    assert "900" in text
+    assert "2450" in text
     # Two case directories should exist
     assert (out_dir / "figures" / "case_001").is_dir()
     assert (out_dir / "figures" / "case_002").is_dir()
