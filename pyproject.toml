@@ -25,6 +25,7 @@ e2e = [
 
 [project.scripts]
 sar-pattern-validation = "sar_pattern_validation.workflow_cli:main"
+sar-pattern-validation-report = "sar_pattern_validation.report_cli:main"
 
 [build-system]
 requires = ["hatchling"]
