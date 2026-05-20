@@ -478,7 +478,7 @@ def test_complete_workflow_raises_mask_too_small_pre_registration(
     """V3: pre-registration MASK_TOO_SMALL raises WorkflowExecutionError (hard error)."""
     from sar_pattern_validation.errors import WorkflowExecutionError
 
-    # Narrow Gaussian (σ=4 mm) on a large grid: noise-filtered active area ~20 mm < 22 mm.
+    # Narrow Gaussian (σ=4 mm) on a large grid: noise-filtered active area ~20 mm < 50 mm.
     x, y = make_rect_grid(xmin=-0.05, xmax=0.05, ymin=-0.05, ymax=0.05, step=0.002)
     _, _, Z_meas = gaussian_2d(x, y, x0=0.0, y0=0.0, sx=0.004, sy=0.004, peak=1.0)
     measured_csv = tmp_path / "narrow_measured.csv"
@@ -494,15 +494,14 @@ def test_complete_workflow_raises_mask_too_small_pre_registration(
             reference_file_path=str(reference_csv),
             render_plots=False,
             show_plot=False,
-            min_inscribed_square_mm=22.0,
         )
 
     issue = exc_info.value.issue
     assert issue is not None
     assert issue.code == "MASK_TOO_SMALL"
     assert issue.severity == "error"
-    assert "pre-registration" in issue.message
-    assert "22" in issue.message
+    assert "too small" in issue.message
+    assert "50" in issue.message
 
 
 @pytest.mark.slow

@@ -399,7 +399,7 @@ def _apply_overlay_legend(
         handles=filtered,
         loc="lower right",
         frameon=True,
-        fontsize=7,
+        fontsize=9,
         framealpha=0.0,
     )
     if on_dark_axes:
