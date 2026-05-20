@@ -8,7 +8,7 @@ import pytest
 from sar_pattern_validation.workflow_cli import main
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 def test_cli_main_function_with_measured_data(tmp_path: Path) -> None:
     """
     Test the main() function directly with measured data files from Git LFS.
@@ -108,7 +108,7 @@ def test_cli_main_function_with_measured_data(tmp_path: Path) -> None:
     assert registered_image_path.exists(), "Registered overlay image should be saved"
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 def test_cli_main_function_with_example_data(tmp_path: Path) -> None:
     """
     Test the main() function directly with example data files.
@@ -187,8 +187,7 @@ def test_cli_main_function_with_example_data(tmp_path: Path) -> None:
     assert registered_output.exists(), "Registered overlay image should be saved"
 
 
-@pytest.mark.slow
-@pytest.mark.integration
+@pytest.mark.validation
 def test_cli_via_subprocess(tmp_path: Path) -> None:
     """
     Test the CLI as it would be invoked from a subprocess (like in the frontend).
@@ -236,6 +235,60 @@ def test_cli_via_subprocess(tmp_path: Path) -> None:
     assert gamma_output.exists()
 
 
+@pytest.mark.validation
+def test_cli_output_dir_creates_artifacts(tmp_path: Path) -> None:
+    """
+    Passing --output-dir should produce results.json, gamma_map.npy,
+    gamma_map.png, and failure_map.png in the specified directory.
+    Asserts results.json contains pass_rate_percent.
+    """
+    repo_root = Path(__file__).parent.parent
+    measured_file = repo_root / "data" / "example" / "measured_sSAR1g.csv"
+    reference_file = repo_root / "data" / "example" / "reference_sSAR1g.csv"
+
+    if not measured_file.exists() or not reference_file.exists():
+        pytest.skip("Example data files not found")
+
+    output_dir = tmp_path / "outputs"
+
+    argv = [
+        "--measured_file_path",
+        str(measured_file),
+        "--reference_file_path",
+        str(reference_file),
+        "--power_level_dbm",
+        "30.0",
+        "--no-render_plots",
+        "--output-dir",
+        str(output_dir),
+    ]
+
+    import io
+    from contextlib import redirect_stdout
+
+    captured = io.StringIO()
+    with redirect_stdout(captured):
+        exit_code = main(argv)
+
+    assert exit_code == 0, f"CLI exited with {exit_code}; stdout: {captured.getvalue()}"
+
+    # Verify all expected artifacts exist
+    assert (output_dir / "results.json").exists(), "results.json missing"
+    assert (output_dir / "gamma_map.npy").exists(), "gamma_map.npy missing"
+    assert (output_dir / "gamma_map.png").exists(), "gamma_map.png missing"
+    assert (output_dir / "failure_map.png").exists(), "failure_map.png missing"
+
+    # Verify results.json contains pass_rate_percent
+    results = json.loads((output_dir / "results.json").read_text())
+    assert "pass_rate_percent" in results
+    assert 0.0 <= results["pass_rate_percent"] <= 100.0
+
+    # Verify stdout JSON still produced regardless of --output-dir
+    stdout_json = json.loads(captured.getvalue())
+    assert stdout_json["status"] == "success"
+    assert "pass_rate_percent" in stdout_json["result"]
+
+
 def test_cli_error_handling(tmp_path: Path) -> None:
     """
     Test that CLI returns proper error JSON when given invalid inputs.
@@ -269,8 +322,7 @@ def test_cli_error_handling(tmp_path: Path) -> None:
     assert "message" in error_output["error"]
 
 
-@pytest.mark.slow
-@pytest.mark.integration
+@pytest.mark.validation
 def test_cli_via_uvx_like_frontend(tmp_path: Path) -> None:
     """
     Test the CLI as it would be invoked from the frontend using uvx.
@@ -368,3 +420,27 @@ def test_cli_via_uvx_like_frontend(tmp_path: Path) -> None:
     assert registered_image_path.exists(), "Registered overlay image should be saved"
     assert measured_image_path.exists(), "Measured image should be saved"
     assert reference_image_path.exists(), "Reference image should be saved"
+
+
+@pytest.mark.validation
+def test_run_pipeline_main_runs_without_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Smoke-test that run_pipeline.main() completes without raising."""
+    import importlib.util
+
+    repo_root = Path(__file__).parent.parent
+
+    # run_pipeline.py uses relative paths (data/, results/); set up a working
+    # directory with a symlink to data/ and an empty results/ output dir.
+    (tmp_path / "data").symlink_to(repo_root / "data")
+    (tmp_path / "results").mkdir()
+    monkeypatch.chdir(tmp_path)
+
+    spec = importlib.util.spec_from_file_location(
+        "run_pipeline", repo_root / "scripts" / "run_pipeline.py"
+    )
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    mod.main()

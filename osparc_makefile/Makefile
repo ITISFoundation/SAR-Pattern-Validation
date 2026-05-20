@@ -66,6 +66,7 @@ copy-notebook:
 clean:
 	@echo "🗑️  Cleaning test run artifacts from $(WORKSPACE_DIR)..."
 	rm -rf $(WORKSPACE_DIR)/images
+	rm -rf $(WORKSPACE_DIR)/report
 	rm -rf $(WORKSPACE_DIR)/system_state
 	rm -rf $(WORKSPACE_DIR)/uploaded_data
 	@echo "✅ Clean complete!"

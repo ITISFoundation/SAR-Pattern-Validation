@@ -73,11 +73,19 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     except Exception as exc:
+        from dataclasses import asdict
+
+        from sar_pattern_validation.errors import WorkflowExecutionError
+
+        issue_data = None
+        if isinstance(exc, WorkflowExecutionError) and exc.issue is not None:
+            issue_data = asdict(exc.issue)
         error_payload = {
             "status": "error",
             "error": {
                 "type": type(exc).__name__,
                 "message": str(exc),
+                **({"issue": issue_data} if issue_data else {}),
             },
         }
 

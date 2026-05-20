@@ -9,6 +9,7 @@ DEFAULT_MEASURED_FILE_PATH: Final[str] = "measured.csv"
 DEFAULT_REFERENCE_FILE_PATH: Final[str] = "reference.csv"
 DEFAULT_POWER_LEVEL_DBM: Final[float] = 30.0
 DEFAULT_NOISE_FLOOR: Final[float] = 0.05
+NOISE_FLOOR_MAX: Final[float] = 0.1
 DEFAULT_SHOW_PLOT: Final[bool] = False
 DEFAULT_RENDER_PLOTS: Final[bool] = True
 DEFAULT_DOSE_TO_AGREEMENT: Final[float] = 5.0
@@ -22,12 +23,23 @@ DEFAULT_ADAPTIVE_ASSUME_AXIAL_SYMMETRY: Final[bool] = True
 DEFAULT_ADAPTIVE_MAX_STAGES: Final[int] = 5
 DEFAULT_ADAPTIVE_MAX_STAGE_EVALS: Final[int] = 50000
 DEFAULT_LOG_LEVEL: Final[str] = "INFO"
+
+# Minimum axis-aligned physical square (mm) that must fit within the gamma
+# evaluation mask for the comparison to be considered valid. 22 mm = the
+# face of the 10 g averaging cube. Per MGD 2026-04-24 feedback, slide 7.
+DEFAULT_MIN_INSCRIBED_SQUARE_MM: Final[float] = 22.0
 DEFAULT_PLOT_WINDOW_MM: Final[tuple[float, float, float, float]] = (
     -120.0,
     120.0,
     -120.0,
     120.0,
 )
+
+# Minimum measurement area: 50 mm on each axis (V14/V15 §B13).
+# 0 is reserved for "auto" (no crop); any non-zero value must be ≥ 50 mm.
+MEASUREMENT_AREA_MIN_MM_EXCLUSIVE: Final[float] = 50.0
+MEASUREMENT_AREA_MAX_X_MM: Final[float] = 600.0
+MEASUREMENT_AREA_MAX_Y_MM: Final[float] = 400.0
 DEFAULT_PLOT_FONT_SIZE: Final[float] = 14.0
 DEFAULT_SINGLE_FIGURE_SIZE: Final[tuple[float, float]] = (6.0, 6.0)
 DEFAULT_COMBINED_FIGURE_SIZE: Final[tuple[float, float]] = (12.0, 5.0)
@@ -35,6 +47,9 @@ DEFAULT_PLOT_FIGURE_FACECOLOR: Final[str] = "white"
 DEFAULT_PLOT_DARK_AXES_FACECOLOR: Final[str] = "black"
 DEFAULT_PLOT_LIGHT_AXES_FACECOLOR: Final[str] = "white"
 DEFAULT_PLOT_SAVE_DPI: Final[int] = 200
+DEFAULT_PLOT_NOT_EVALUATED_COLOR: Final[str] = "lightgray"
+DEFAULT_PLOT_CROPPED_DATA_COLOR: Final[str] = "#555555"
+DEFAULT_PLOT_NOISE_FLOOR_COLOR: Final[str] = "#9aa0a6"
 
 ROI_POLICY_CHOICES: Final[tuple[str, ...]] = ("reference_only", "intersection", "none")
 EvaluationRoiPolicy = Literal["reference_only", "intersection", "none"]
@@ -76,6 +91,14 @@ class PlottingConfig:
     dark_axes_facecolor: str = DEFAULT_PLOT_DARK_AXES_FACECOLOR
     light_axes_facecolor: str = DEFAULT_PLOT_LIGHT_AXES_FACECOLOR
     save_dpi: int = DEFAULT_PLOT_SAVE_DPI
+    not_evaluated_color: str = DEFAULT_PLOT_NOT_EVALUATED_COLOR
+    cropped_data_color: str = DEFAULT_PLOT_CROPPED_DATA_COLOR
+    noise_floor_color: str = DEFAULT_PLOT_NOISE_FLOOR_COLOR
+    measurement_area_x_mm: float | None = None
+    measurement_area_y_mm: float | None = None
+    center_x_mm: float = 0.0
+    center_y_mm: float = 0.0
+    save_colorbars: bool = True
 
 
 @dataclass
@@ -113,3 +136,7 @@ class WorkflowConfig:
     save_failures_overlay: bool = True
     log_level: str = DEFAULT_LOG_LEVEL
     plotting: PlottingConfig = field(default_factory=PlottingConfig)
+    output_dir: str | None = None
+    measurement_area_x_mm: float | None = None
+    measurement_area_y_mm: float | None = None
+    min_inscribed_square_mm: float = DEFAULT_MIN_INSCRIBED_SQUARE_MM

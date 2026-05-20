@@ -1,0 +1,36 @@
+{
+  "artifact_version": 1,
+  "dataset": {
+    "averaging_mass": "10g",
+    "distance_mm": 15,
+    "frequency_key": "900mhz",
+    "frequency_label": "900 MHz",
+    "frequency_mhz": 900,
+    "group_key": "900mhz_20dbm",
+    "measured_csv": "data/measurements/D900_Flat HSL_15 mm_20 dBm_10g_4.csv",
+    "power_level_dbm": 20.0,
+    "power_level_key": "20dbm",
+    "reference_csv": "data/database/dipole_900MHz_Flat_15mm_10g.csv",
+    "source_group": "expanded_measurements"
+  },
+  "expected": {
+    "evaluated_pixel_count": 3810,
+    "failed_pixel_count": 0,
+    "measured_pssar": 6.17,
+    "pass_rate_percent": 100.0,
+    "passed_pixel_count": 3810,
+    "reference_pssar": 6.991846561431885,
+    "scaling_error": -0.11754356366532959
+  },
+  "inputs": {
+    "distance_to_agreement_mm": 3.0,
+    "dose_to_agreement_percent": 10.0,
+    "evaluation_roi_policy": "intersection",
+    "gamma_cap": 2.0,
+    "noise_floor_wkg": 0.05,
+    "power_level_dbm": 20.0
+  },
+  "success_thresholds": {
+    "require_zero_failed_pixels": true
+  }
+}

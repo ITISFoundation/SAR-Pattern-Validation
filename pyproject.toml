@@ -16,12 +16,19 @@ dependencies = [
     "simpleitk>=2.2.1",
 ]
 
+[project.optional-dependencies]
+e2e = [
+    "pytest-playwright>=0.7.2",
+    "playwright>=1.59.0",
+    "voila>=0.5.12",
+]
+
 [project.scripts]
 sar-pattern-validation = "sar_pattern_validation.workflow_cli:main"
 
 [build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
@@ -35,12 +42,8 @@ dev = [
     "ty>=0.0.1",
 ]
 
-[tool.setuptools]
-package-dir = { "" = "src" }
-
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["sar_pattern_validation*"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/sar_pattern_validation"]
 
 [tool.bandit]
 exclude_dirs = ["tests"]
@@ -64,8 +67,10 @@ ignore = ["B028", "E501", "N806", "N813", "N803"]
 [tool.pytest.ini_options]
 addopts = "-n auto --dist worksteal"
 markers = [
-    "slow: mark test as relatively slow",
-    "integration: mark test as integration",
+    "slow: mark test as compute-heavy (uses synthetic data, no LFS needed)",
+    "validation: mark test as validation against reference artifacts (requires Git LFS data)",
+    "e2e: end-to-end Playwright test against a live voila server (gated by --run-e2e; run with -p no:xdist)",
+    "notebook_smoke: kernel-execution smoke test for notebooks/voila.ipynb; requires the Python 3.9 / Pydantic V1 jupyter-math frontend container — excluded from make ci fast/slow runs, exercised only in the e2e-tests CI job",
 ]
 
 [tool.coverage.run]

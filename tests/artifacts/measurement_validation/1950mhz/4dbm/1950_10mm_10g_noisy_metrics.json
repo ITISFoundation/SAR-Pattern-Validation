@@ -1,0 +1,36 @@
+{
+  "artifact_version": 1,
+  "dataset": {
+    "averaging_mass": "10g",
+    "distance_mm": 10,
+    "frequency_key": "1950mhz",
+    "frequency_label": "1.95 GHz",
+    "frequency_mhz": 1950,
+    "group_key": "1950mhz_4dbm",
+    "measured_csv": "data/measurements/D1950_Flat HSL_10 mm_4 dBm_10g_14.csv",
+    "power_level_dbm": 4.0,
+    "power_level_key": "4dbm",
+    "reference_csv": "data/database/dipole_1950MHz_Flat_10mm_10g.csv",
+    "source_group": "robustness"
+  },
+  "expected": {
+    "evaluated_pixel_count": 758,
+    "failed_pixel_count": 0,
+    "measured_pssar": 19.10914418656787,
+    "pass_rate_percent": 100.0,
+    "passed_pixel_count": 758,
+    "reference_pssar": 20.882190704345703,
+    "scaling_error": -0.08490711261481065
+  },
+  "inputs": {
+    "distance_to_agreement_mm": 3.0,
+    "dose_to_agreement_percent": 10.0,
+    "evaluation_roi_policy": "intersection",
+    "gamma_cap": 2.0,
+    "noise_floor_wkg": 0.01,
+    "power_level_dbm": 4.0
+  },
+  "success_thresholds": {
+    "require_zero_failed_pixels": true
+  }
+}

@@ -22,6 +22,7 @@ Terminology
 from __future__ import annotations
 
 import warnings
+from dataclasses import replace
 from pathlib import Path
 from typing import NamedTuple
 
@@ -66,6 +67,8 @@ class SARImageLoader:
         reference_save_path: Path | None = None,
         measured_save_path: Path | None = None,
         warn: bool = True,
+        measurement_area_x_mm: float | None = None,
+        measurement_area_y_mm: float | None = None,
     ):
         if not measured_path or not reference_path:
             raise ValueError("Both measured_path and reference_path are required.")
@@ -75,6 +78,25 @@ class SARImageLoader:
 
         measured_df = self._read_csv(measured_path)
         reference_df = self._read_csv(reference_path)
+
+        # V13/V19: filter measured data to declared measurement area, centred on the
+        # midpoint of the imported data grid (mean of x/y extents), before mask
+        # computation, registration, and gamma evaluation.
+        if measurement_area_x_mm is not None and measurement_area_y_mm is not None:
+            cx_m = (measured_df["x_m"].min() + measured_df["x_m"].max()) / 2.0
+            cy_m = (measured_df["y_m"].min() + measured_df["y_m"].max()) / 2.0
+            x_half_m = float(measurement_area_x_mm) / 2.0 / 1000.0
+            y_half_m = float(measurement_area_y_mm) / 2.0 / 1000.0
+            measured_df = measured_df[
+                ((measured_df["x_m"] - cx_m).abs() <= x_half_m)
+                & ((measured_df["y_m"] - cy_m).abs() <= y_half_m)
+            ].copy()
+            if len(measured_df) == 0:
+                raise CsvFormatError(
+                    f"No measured data falls within the declared measurement area "
+                    f"({measurement_area_x_mm:.0f} × {measurement_area_y_mm:.0f} mm). "
+                    "Check that the area contains the measurement scan region."
+                )
 
         meas_grid = self._to_grid(measured_df, resample_resolution)
         ref_grid = self._to_grid(reference_df, resample_resolution)
@@ -95,8 +117,12 @@ class SARImageLoader:
         threshold_cap_wkg = 0.1
         cutoff_wkg = float(min(threshold_cap_wkg, 2.0 * self.noise_floor_wkg))
 
+        self.measured_raw_peak = float(np.max(meas_sar)) if meas_sar.size > 0 else 0.0
         meas_mask = (meas_sar >= cutoff_wkg) & meas_support
         ref_mask = (ref_sar >= cutoff_wkg) & ref_support
+
+        meas_noise_floor_mask = meas_support & ~(meas_sar >= cutoff_wkg)
+        ref_noise_floor_mask = ref_support & ~(ref_sar >= cutoff_wkg)
 
         self.measured_peak = (
             float(meas_sar[meas_mask].max()) if np.any(meas_mask) else 1e-12
@@ -140,6 +166,8 @@ class SARImageLoader:
         self._reference_mask_abs = ref_mask
         self._measured_support_mask = meas_support
         self._reference_support_mask = ref_support
+        self._measured_noise_floor_mask = meas_noise_floor_mask
+        self._reference_noise_floor_mask = ref_noise_floor_mask
         self._measured_axes_m = meas_axes
         self._reference_axes_m = ref_axes
 
@@ -466,6 +494,10 @@ class SARImageLoader:
                 reference_image=ref_unit,
                 measured_axes=(x_meas, y_meas),
                 reference_axes=(x_ref, y_ref),
+                measured_support_mask=self._measured_support_mask,
+                reference_support_mask=self._reference_support_mask,
+                measured_noise_floor_mask=self._measured_noise_floor_mask,
+                reference_noise_floor_mask=self._reference_noise_floor_mask,
                 image_save_path=image_save_path,
                 plotting_config=plotting_config,
             )
@@ -477,21 +509,33 @@ class SARImageLoader:
         ):
             return
 
-        y_ipk, x_ipk = np.unravel_index(np.argmax(meas_unit), meas_unit.shape)
-        x_meas_shift = x_meas - x_meas[x_ipk]
-        y_meas_shift = y_meas - y_meas[y_ipk]
-
         plot_sar_image(
             sar_image=meas_unit,
-            x_axis_m=x_meas_shift,
-            y_axis_m=y_meas_shift,
+            x_axis_m=x_meas,
+            y_axis_m=y_meas,
             title="Measured, Normalized",
             xlabel="$x_e$ (mm)",
             ylabel="$y_e$ (mm)",
             save_path=measured_save_path,
             show_colorbar=False,
+            support_mask=self._measured_support_mask,
+            noise_floor_mask=self._measured_noise_floor_mask,
             plotting_config=plotting_config,
         )
+
+        reference_plotting_config = plotting_config
+        if plotting_config is not None:
+            half = max(
+                (plotting_config.window_mm[1] - plotting_config.window_mm[0]) / 2.0,
+                (plotting_config.window_mm[3] - plotting_config.window_mm[2]) / 2.0,
+            )
+            reference_plotting_config = replace(
+                plotting_config,
+                center_x_mm=0.0,
+                center_y_mm=0.0,
+                window_mm=(-half, half, -half, half),
+            )
+
         plot_sar_image(
             sar_image=ref_unit,
             x_axis_m=x_ref,
@@ -501,7 +545,9 @@ class SARImageLoader:
             ylabel="$y_r$ (mm)",
             save_path=reference_save_path,
             show_colorbar=False,
-            plotting_config=plotting_config,
+            support_mask=self._reference_support_mask,
+            noise_floor_mask=self._reference_noise_floor_mask,
+            plotting_config=reference_plotting_config,
         )
 
     def plot_aligned(
@@ -514,15 +560,17 @@ class SARImageLoader:
         arr_min = float(np.nanmin(aligned_arr))
         arr_max = float(np.nanmax(aligned_arr))
         aligned_unit = (aligned_arr - arr_min) / max(arr_max - arr_min, 1e-12)
-        x_ref, y_ref = self._reference_axes_m
+        x_meas, y_meas = self._measured_axes_m
         plot_sar_image(
             sar_image=aligned_unit,
-            x_axis_m=x_ref,
-            y_axis_m=y_ref,
-            title="Measured, After Registration",
-            xlabel="$x'_e$ (mm)",
-            ylabel="$y'_e$ (mm)",
+            x_axis_m=x_meas,
+            y_axis_m=y_meas,
+            title="Reference, After Registration",
+            xlabel="$x'_r$ (mm)",
+            ylabel="$y'_r$ (mm)",
             save_path=aligned_meas_save_path,
             show_colorbar=True,
+            support_mask=self._measured_support_mask,
+            noise_floor_mask=self._measured_noise_floor_mask,
             plotting_config=plotting_config,
         )

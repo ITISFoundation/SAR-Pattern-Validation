@@ -1,0 +1,110 @@
+\documentclass{article}
+
+\usepackage[english]{babel}
+\usepackage[a4paper,top=2cm,bottom=2cm,left=3cm,right=3cm,marginparwidth=1.75cm]{geometry}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+\usepackage{subcaption}
+\usepackage{placeins}
+\usepackage{xspace}
+\IfFileExists{datetime.sty}{%
+  \usepackage[us,24hr]{datetime}%
+}{}
+\IfFileExists{helvet.sty}{%
+  \usepackage{helvet}%
+  \renewcommand{\familydefault}{\sfdefault}%
+}{}
+\usepackage{fp}
+\usepackage{footnote}
+\makesavenoteenv{tabular}
+
+% input variables
+\newcommand{\filemeas}{dipole\_2450MHz\_Flat\_10mm\_16.5dBm.csv}
+\newcommand{\noiselevel}{0.02} % W/kg
+
+\newcommand{\antennatype}{dipole}
+\newcommand{\frequency}{2450} % MHz
+\newcommand{\distance}{10} % mm
+\newcommand{\mass}{10}  % grams
+\newcommand{\powerlevel}{16.5} % dBm
+
+\newcommand{\pssarref}{24.71}  % W/kg
+\newcommand{\pssarmeas}{1.31} % W/kg
+\FPeval{\pssarscaled}{round(\pssarmeas * 10^((30-\powerlevel)/10),2)}
+%\newcommand{\errscale}{-0.35} % percent
+\FPeval{\errscale}{round(100*((\pssarscaled / \pssarref) - 1),2)}
+\FPeval{\errscaleabs}{abs(\errscale)}
+\newcommand{\errscaletolerance}{25.0}
+
+\newcommand{\measx}{100} % percent
+\newcommand{\measy}{200} % percent
+
+\newcommand{\deltadist}{2~mm\xspace}
+\newcommand{\deltadose}{5.0~\%\xspace}
+\def\passrate{100.0}
+\FPeval{\failrate}{round(100.0-\passrate,1)}
+
+\FPiflt{\passrate}{100.0}%
+    \newcommand{\passfail}{\textbf{Fail}}
+    \newcommand{\gammastatement}{The pattern validation fails because $\Gamma (x_e,y_e)~>~1.0$ at \failrate \% of the locations of the measured sSAR distribution compared to the reference, }
+\else
+    \newcommand{\passfail}{\textbf{Pass}}
+    \newcommand{\gammastatement}{The pattern validation passes because $\Gamma (x_e,y_e)~\leq~1.0$ at all locations of the measured sSAR distribution, compared to the reference, }
+\fi
+
+\FPifgt{\errscaleabs}{\errscaletolerance}%
+    \newcommand{\scalestatement}{The scaling error for the psSAR is outside the $\pm$~\errscaletolerance~\% criteria.}
+\else
+    \newcommand{\scalestatement}{The scaling error for the psSAR is within the $\pm$~\errscaletolerance~\% criteria.}
+\fi
+
+\title{SAR Pattern Validation Report}
+
+\begin{document}
+\thispagestyle{empty}
+\begin{center}
+    \section*{SAR Pattern Assessment Report for IEC/IEEE PAS 62209-5}
+    \today
+\end{center}
+
+\subsection*{Measured sSAR Parameters}
+
+File name: \texttt{\filemeas}\\
+Measurement area: ($x$, $y$) = (\measx~mm, \measy~mm).
+
+\begin{table}[htpb] \centering
+\begin{tabular}{ccccc||cccc}
+
+\textbf{Source} &\textbf{Freq.} & \textbf{Dist.} & \textbf{Avg.}& \textbf{Noise}& \textbf{psSAR} &\multicolumn{2}{c}{\textbf{psSAR at 30~dBm}}& \textbf{Scaling} \\
+\textbf{Type} & & & \textbf{Mass} & \textbf{Floor}& \textbf{Meas.}& \textbf{Meas.} & \textbf{Ref.} & \textbf{Error} \\
+& \textbf{(MHz)} & \textbf{(mm)} & \textbf{(g)} & \textbf{(W/kg)} &\textbf{(W/kg)} & \textbf{(W/kg)} & \textbf{(W/kg)} & \textbf{(\%)} \\\hline
+\antennatype & \frequency & \distance & \mass & \noiselevel & \pssarmeas & \pssarscaled & \pssarref & \errscale \\
+\end{tabular}
+\label{tab:meas-params}
+\end{table}
+
+\FloatBarrier
+\subsection*{Results}
+
+\gammastatement ~according to the Gamma criterion described in IEC/IEEE PAS 62209-5
+with $\Delta D~=~$\deltadose, $\Delta d$~=~\deltadist. \scalestatement
+
+\begin{figure}[h!]
+  \centering
+  \begin{tabular}{c}
+    \includegraphics[width=.62\linewidth]{figures/gamma_failures.png}
+  \end{tabular}%
+  \begin{tabular}{c}
+    \includegraphics[width=.32\linewidth]{figures/gamma_index_with_colorbar.png} \\
+    \includegraphics[width=.32\linewidth]{figures/registration_nocolorbar.png} \\
+  \end{tabular}
+  \begin{tabular}{c}
+    \includegraphics[width=.45\linewidth]{figures/measured_with_colorbar.png}
+  \end{tabular}%
+  \begin{tabular}{c}
+    \includegraphics[width=.45\linewidth]{figures/reference_with_colorbar.png}
+  \end{tabular}
+  % \caption*{}
+\end{figure}
+\end{document}

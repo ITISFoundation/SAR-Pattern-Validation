@@ -2,9 +2,6 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches:
-      - "**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -14,17 +11,15 @@ permissions:
   contents: read
 
 jobs:
-  fast-tests:
-    name: Fast tests
+  tests:
+    name: Tests
     runs-on: ubuntu-latest
     container:
-      image: itisfoundation/jupyter-math:3.0.5
-    env:
-      DISPLAY: ":0"
-      NVIDIA_DRIVER_CAPABILITIES: all
+      image: ghcr.io/astral-sh/uv:python3.10-bookworm
+
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install system dependencies
         shell: bash
@@ -34,55 +29,132 @@ jobs:
           apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
           apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64/7fa2af80.pub
 
-      - name: Install uv
-        shell: bash
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
-          uv --version
-
       - name: Sync dependencies
         shell: bash
-        run: uv sync --all-groups
+        run: uv sync --all-groups --frozen
 
       - name: Print environment
         shell: bash
         run: env | sort
 
-      - name: Run fast tests with coverage
+      - name: Run tests with coverage
         shell: bash
-        run: uv run pytest -v -m "not slow" --cov=src/sar_pattern_validation --cov-report=xml:coverage.xml --cov-report=term tests/
+        run: uv run pytest -v -m "not slow and not validation and not notebook_smoke" --cov=src/sar_pattern_validation --cov-report=xml:coverage.xml --cov-report=term tests/
 
-      - name: Upload fast coverage artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v7
         with:
-          name: coverage-fast-tests
+          name: coverage-tests
           path: coverage.xml
           if-no-files-found: error
           retention-days: 30
 
   slow-tests:
-    name: Slow tests
+    name: Slow & integration tests
     runs-on: ubuntu-latest
-    needs:
-      - fast-tests
+    needs: [type-check, tests]
+    container:
+      image: ghcr.io/astral-sh/uv:python3.10-bookworm
+    env:
+      MPLBACKEND: Agg
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install git-lfs and pull example data
+        shell: bash
+        run: |
+          apt-get update -qq
+          apt-get download git-lfs
+          dpkg -x git-lfs_*.deb /tmp/git-lfs-pkg
+          find /tmp/git-lfs-pkg -name git-lfs -type f -exec install -m755 {} /usr/local/bin/git-lfs \;
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git lfs install
+          git lfs pull --include="data/example/**"
+
+      - name: Sync dependencies
+        shell: bash
+        run: uv sync --all-groups --frozen
+
+      - name: Run slow and integration tests
+        shell: bash
+        run: |
+          uv run pytest -v -m "(slow or validation) and not notebook_smoke" \
+            --basetemp=test-artifacts \
+            --ignore=tests/test_measurement_validation.py \
+            --cov=src/sar_pattern_validation --cov-report=xml:coverage-validation.xml --cov-report=term \
+            tests/
+
+      - name: Upload slow coverage artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-slow-tests
+          path: coverage-validation.xml
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload slow test artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: slow-test-artifacts
+          path: test-artifacts/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  type-check:
+    name: Lint & type check (ruff + ty)
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/astral-sh/uv:python3.10-bookworm
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Sync dependencies
+        shell: bash
+        run: uv sync --all-groups --frozen
+
+      - name: Run ruff linter
+        shell: bash
+        run: uv run ruff check src/ tests/
+
+      - name: Run ty type checker
+        shell: bash
+        run: uv run ty check src/
+
+  e2e-tests:
+    name: E2E (Voila + Playwright)
+    runs-on: ubuntu-latest
+    needs: [type-check, tests]
     container:
       image: itisfoundation/jupyter-math:3.0.5
     env:
-      DISPLAY: ":0"
-      NVIDIA_DRIVER_CAPABILITIES: all
+      MPLBACKEND: Agg
+      PLAYWRIGHT_BROWSERS_PATH: /root/.cache/ms-playwright
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Install system dependencies
+      - name: Install Playwright + tooling system deps
         shell: bash
         run: |
           apt-get update
-          apt-get install -y gnupg git-lfs time procps tree curl
-          git lfs install --force
-          git lfs pull
-          apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
-          apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64/7fa2af80.pub
+          apt-get install -y --no-install-recommends \
+            curl ca-certificates git-lfs procps ffmpeg \
+            libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
+            libcups2 libxkbcommon0 libatspi2.0-0 libx11-6 libxcomposite1 \
+            libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 libasound2 \
+            libpangocairo-1.0-0 libpango-1.0-0 libcairo2 fonts-liberation
+
+      - name: Pull git-lfs example data
+        shell: bash
+        # The single database file is the reference selected by
+        # tests/test_voila_e2e.py::_REFERENCE_FILTERS — keep both in sync.
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git lfs install
+          git lfs pull --include="data/example/**"
+          git lfs pull --include="data/database/dipole_1450MHz_Flat_5mm_1g.csv"
 
       - name: Install uv
         shell: bash
@@ -90,22 +162,43 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
           uv --version
 
-      - name: Sync dependencies
+      - name: Install testing-layer deps into kernel venv
         shell: bash
-        run: uv sync --all-groups
+        run: |
+          uv pip install --python /home/jovyan/.venv/bin/python \
+            pytest pytest-playwright pytest-xdist playwright
 
-      - name: Print environment
+      - name: Install Chromium for Playwright
         shell: bash
-        run: env | sort
+        run: /home/jovyan/.venv/bin/playwright install chromium
 
-      - name: Run full test suite with slow tests and coverage
+      - name: Notebook kernel smoke test (§V3 — fail fast before Playwright)
         shell: bash
-        run: uv run pytest -v --run-slow --cov=src/sar_pattern_validation --cov-report=xml:coverage.xml --cov-report=term tests/
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          /home/jovyan/.venv/bin/python -m pytest -v -o "addopts=" \
+            -m notebook_smoke \
+            tests/test_notebook_smoke.py
 
-      - name: Upload slow coverage artifact
-        uses: actions/upload-artifact@v4
+      - name: Run voila e2e suite
+        shell: bash
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          /home/jovyan/.venv/bin/python -m pytest -v -o "addopts=" \
+            --run-e2e -p no:xdist -m "not skip" \
+            --screenshot on \
+            --video retain-on-failure \
+            --tracing retain-on-failure \
+            --output tests/artifacts/playwright \
+            tests/test_voila_e2e.py
+
+      - name: Upload E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
-          name: coverage-slow-tests
-          path: coverage.xml
-          if-no-files-found: error
+          name: playwright-results
+          path: tests/artifacts/playwright/
+          if-no-files-found: ignore
           retention-days: 30

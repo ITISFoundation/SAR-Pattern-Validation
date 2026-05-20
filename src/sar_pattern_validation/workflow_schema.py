@@ -26,11 +26,13 @@ from sar_pattern_validation.workflow_config import (
     DEFAULT_GAMMA_CAP,
     DEFAULT_LOG_LEVEL,
     DEFAULT_MEASURED_FILE_PATH,
+    DEFAULT_MIN_INSCRIBED_SQUARE_MM,
     DEFAULT_NOISE_FLOOR,
     DEFAULT_PLOT_DARK_AXES_FACECOLOR,
     DEFAULT_PLOT_FIGURE_FACECOLOR,
     DEFAULT_PLOT_FONT_SIZE,
     DEFAULT_PLOT_LIGHT_AXES_FACECOLOR,
+    DEFAULT_PLOT_NOT_EVALUATED_COLOR,
     DEFAULT_PLOT_SAVE_DPI,
     DEFAULT_PLOT_WINDOW_MM,
     DEFAULT_POWER_LEVEL_DBM,
@@ -40,6 +42,9 @@ from sar_pattern_validation.workflow_config import (
     DEFAULT_SHOW_PLOT,
     DEFAULT_SINGLE_FIGURE_SIZE,
     LOG_LEVEL_CHOICES,
+    MEASUREMENT_AREA_MAX_X_MM,
+    MEASUREMENT_AREA_MAX_Y_MM,
+    MEASUREMENT_AREA_MIN_MM_EXCLUSIVE,
     PlottingConfig,
     WorkflowConfig,
     default_registration_stages,
@@ -63,6 +68,9 @@ class PlottingConfigSchema(BaseModel):
     dark_axes_facecolor: str = DEFAULT_PLOT_DARK_AXES_FACECOLOR
     light_axes_facecolor: str = DEFAULT_PLOT_LIGHT_AXES_FACECOLOR
     save_dpi: int = Field(default=DEFAULT_PLOT_SAVE_DPI, gt=0)
+    not_evaluated_color: str = DEFAULT_PLOT_NOT_EVALUATED_COLOR
+    measurement_area_x_mm: float | None = None
+    measurement_area_y_mm: float | None = None
 
     @field_validator("single_figure_size", "combined_figure_size")
     @classmethod
@@ -87,7 +95,7 @@ class WorkflowConfigSchema(BaseModel):
     gamma_comparison_image_path: str | None = None
 
     resample_resolution: float | None = Field(default=None, gt=0)
-    noise_floor: float = Field(default=DEFAULT_NOISE_FLOOR, gt=0)
+    noise_floor: float = Field(default=DEFAULT_NOISE_FLOOR, ge=0)
     show_plot: bool = DEFAULT_SHOW_PLOT
     render_plots: bool = DEFAULT_RENDER_PLOTS
 
@@ -115,6 +123,20 @@ class WorkflowConfigSchema(BaseModel):
     save_failures_overlay: bool = True
     log_level: str = DEFAULT_LOG_LEVEL
     plotting: PlottingConfigSchema = Field(default_factory=PlottingConfigSchema)
+    output_dir: str | None = None
+    measurement_area_x_mm: float | None = Field(
+        default=None,
+        gt=MEASUREMENT_AREA_MIN_MM_EXCLUSIVE,
+        le=MEASUREMENT_AREA_MAX_X_MM,
+    )
+    measurement_area_y_mm: float | None = Field(
+        default=None,
+        gt=MEASUREMENT_AREA_MIN_MM_EXCLUSIVE,
+        le=MEASUREMENT_AREA_MAX_Y_MM,
+    )
+    min_inscribed_square_mm: float = Field(
+        default=DEFAULT_MIN_INSCRIBED_SQUARE_MM, gt=0
+    )
 
     @field_validator("log_level")
     @classmethod
@@ -147,6 +169,26 @@ class WorkflowConfigSchema(BaseModel):
                 raise ValueError(
                     f"stages.{index}.rot_span_deg must be > 0 for rigid registration"
                 )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_measurement_area(self) -> WorkflowConfigSchema:
+        x = self.measurement_area_x_mm
+        y = self.measurement_area_y_mm
+        if (x is None) != (y is None):
+            raise ValueError(
+                "measurement_area_x_mm and measurement_area_y_mm must be set together"
+            )
+        if x is not None and y is not None:
+            side = max(x, y)
+            half = side / 2.0
+            self.plotting = self.plotting.model_copy(
+                update={
+                    "window_mm": (-half, half, -half, half),
+                    "measurement_area_x_mm": x,
+                    "measurement_area_y_mm": y,
+                }
+            )
         return self
 
     def to_workflow_config(self) -> WorkflowConfig:

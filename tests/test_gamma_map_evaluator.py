@@ -77,7 +77,7 @@ def test_gamma_dose_only_uniform_fields_is_analytic():
     evaluator = GammaMapEvaluator(
         reference_sar_linear=ref_img,
         measured_sar_linear=meas_img,
-        measured_to_reference_transform=_identity_transform(),
+        reference_to_measured_transform=_identity_transform(),
         dose_to_agreement_percent=dose_percent,
         distance_to_agreement_mm=2.0,
         gamma_cap=10.0,  # avoid cap interfering
@@ -126,7 +126,7 @@ def test_gamma_distance_only_single_peak_shift_is_analytic():
     evaluator = GammaMapEvaluator(
         reference_sar_linear=ref_img,
         measured_sar_linear=meas_img,
-        measured_to_reference_transform=_identity_transform(),
+        reference_to_measured_transform=_identity_transform(),
         dose_to_agreement_percent=1.0,
         distance_to_agreement_mm=dta_mm,
         gamma_cap=10.0,
@@ -184,7 +184,7 @@ def test_gamma_distance_case_between_one_and_cap_is_analytic():
     evaluator = GammaMapEvaluator(
         reference_sar_linear=ref_img,
         measured_sar_linear=meas_img,
-        measured_to_reference_transform=_identity_transform(),
+        reference_to_measured_transform=_identity_transform(),
         dose_to_agreement_percent=0.0001,
         distance_to_agreement_mm=2.0,
         gamma_cap=2.0,
@@ -217,7 +217,7 @@ def test_gamma_distance_case_beyond_cap_is_capped():
     evaluator = GammaMapEvaluator(
         reference_sar_linear=ref_img,
         measured_sar_linear=meas_img,
-        measured_to_reference_transform=_identity_transform(),
+        reference_to_measured_transform=_identity_transform(),
         dose_to_agreement_percent=0.0001,
         distance_to_agreement_mm=2.0,
         gamma_cap=2.0,
@@ -248,7 +248,7 @@ def test_evaluation_mask_reference_only_is_used_as_is():
     evaluator = GammaMapEvaluator(
         reference_sar_linear=ref_img,
         measured_sar_linear=meas_img,
-        measured_to_reference_transform=_identity_transform(),
+        reference_to_measured_transform=_identity_transform(),
         dose_to_agreement_percent=5.0,
         distance_to_agreement_mm=2.0,
     )
@@ -258,6 +258,137 @@ def test_evaluation_mask_reference_only_is_used_as_is():
     assert evaluator.evaluation_mask is not None
     assert evaluator.evaluated_pixel_count == int(mask.sum())
     assert np.array_equal(evaluator.evaluation_mask, mask)
+
+
+def test_inscribed_square_passes_for_square_22mm_at_1mm_spacing():
+    """22 mm × 22 mm square mask at 1 mm spacing passes the inscribed-22mm check."""
+    h, w = 30, 30
+    ref = np.ones((h, w), dtype=np.float32)
+    meas = np.ones((h, w), dtype=np.float32)
+    ref_img = _sitk_from_array(ref, spacing_m=(0.001, 0.001))
+    meas_img = _sitk_from_array(meas, spacing_m=(0.001, 0.001))
+
+    mask = np.zeros((h, w), dtype=bool)
+    mask[4:26, 4:26] = True  # 22×22 active region
+    mask_u8 = _u8_mask_from_bool(mask, meas_img)
+
+    evaluator = GammaMapEvaluator(
+        reference_sar_linear=ref_img,
+        measured_sar_linear=meas_img,
+        reference_to_measured_transform=_identity_transform(),
+    )
+    evaluator.measured_mask_u8 = mask_u8
+    evaluator.compute()
+
+    assert evaluator.evaluation_mask_fits_axis_aligned_square_mm(22.0)
+
+
+def test_inscribed_square_fails_for_sub_22mm_square_at_1mm_spacing():
+    """21×21 mm square mask at 1 mm spacing fails the inscribed-22mm check."""
+    h, w = 30, 30
+    ref = np.ones((h, w), dtype=np.float32)
+    meas = np.ones((h, w), dtype=np.float32)
+    ref_img = _sitk_from_array(ref, spacing_m=(0.001, 0.001))
+    meas_img = _sitk_from_array(meas, spacing_m=(0.001, 0.001))
+
+    mask = np.zeros((h, w), dtype=bool)
+    mask[4:25, 4:25] = True  # 21×21 active region
+    mask_u8 = _u8_mask_from_bool(mask, meas_img)
+
+    evaluator = GammaMapEvaluator(
+        reference_sar_linear=ref_img,
+        measured_sar_linear=meas_img,
+        reference_to_measured_transform=_identity_transform(),
+    )
+    evaluator.measured_mask_u8 = mask_u8
+    evaluator.compute()
+
+    assert not evaluator.evaluation_mask_fits_axis_aligned_square_mm(22.0)
+
+
+def test_inscribed_square_fails_for_l_shaped_mask_passing_per_axis():
+    """
+    L-shaped mask whose bounding box passes a per-axis ≥22 mm check, but no
+    axis-aligned 22×22 mm square fits inside the L. Verifies the inscribed
+    check catches what naive per-axis checks miss.
+    """
+    h, w = 60, 60
+    ref = np.ones((h, w), dtype=np.float32)
+    meas = np.ones((h, w), dtype=np.float32)
+    ref_img = _sitk_from_array(ref, spacing_m=(0.001, 0.001))
+    meas_img = _sitk_from_array(meas, spacing_m=(0.001, 0.001))
+
+    # L-shape: a horizontal arm 30 mm × 10 mm joined to a vertical arm
+    # 10 mm × 30 mm. Per-axis bounding box is 30 mm × 30 mm, but the largest
+    # inscribed axis-aligned square is 10 mm × 10 mm.
+    mask = np.zeros((h, w), dtype=bool)
+    mask[10:20, 10:40] = True  # horizontal arm (10 high, 30 wide)
+    mask[10:40, 10:20] = True  # vertical arm (30 high, 10 wide)
+    mask_u8 = _u8_mask_from_bool(mask, meas_img)
+
+    evaluator = GammaMapEvaluator(
+        reference_sar_linear=ref_img,
+        measured_sar_linear=meas_img,
+        reference_to_measured_transform=_identity_transform(),
+    )
+    evaluator.measured_mask_u8 = mask_u8
+    evaluator.compute()
+
+    # Sanity: per-axis bounding box would pass 22 mm ≥ check
+    ys, xs = np.where(evaluator.evaluation_mask)
+    assert (xs.max() - xs.min() + 1) >= 22
+    assert (ys.max() - ys.min() + 1) >= 22
+
+    # Inscribed-square check correctly fails
+    assert not evaluator.evaluation_mask_fits_axis_aligned_square_mm(22.0)
+    # And the largest inscribed square (10 mm) trivially passes a 10 mm check
+    assert evaluator.evaluation_mask_fits_axis_aligned_square_mm(10.0)
+
+
+def test_evaluation_mask_excludes_noise_filtered_pixels():
+    """
+    Noise-filtered (sub-cutoff) pixels must be absent from the gamma evaluation
+    mask. Per MGD 2026-04-24 feedback (Task 6.4): the mask must exclude both
+    unmeasured points AND points zeroed by the noise filter.
+
+    Construct a measured mask that has a "noise hole" (a region where SAR fell
+    below the cutoff and was zeroed) and assert those pixels do not appear in
+    evaluator.evaluation_mask.
+    """
+    h, w = 64, 64
+    ref = np.ones((h, w), dtype=np.float32)
+    meas = np.ones((h, w), dtype=np.float32)
+
+    ref_img = _sitk_from_array(ref, spacing_m=(0.001, 0.001))
+    meas_img = _sitk_from_array(meas, spacing_m=(0.001, 0.001))
+
+    # Reference is fully active; measured has a noise-filtered region carved
+    # out of an otherwise active mask.
+    ref_mask = np.ones((h, w), dtype=bool)
+    meas_mask = np.ones((h, w), dtype=bool)
+    noise_hole = np.s_[20:40, 20:40]
+    meas_mask[noise_hole] = False
+
+    ref_mask_u8 = _u8_mask_from_bool(ref_mask, ref_img)
+    meas_mask_u8 = _u8_mask_from_bool(meas_mask, meas_img)
+
+    evaluator = GammaMapEvaluator(
+        reference_sar_linear=ref_img,
+        measured_sar_linear=meas_img,
+        reference_to_measured_transform=_identity_transform(),
+        dose_to_agreement_percent=5.0,
+        distance_to_agreement_mm=2.0,
+    )
+    evaluator.reference_mask_u8 = ref_mask_u8
+    evaluator.measured_mask_u8 = meas_mask_u8
+    evaluator.compute()
+
+    assert evaluator.evaluation_mask is not None
+    # No noise-hole pixel should appear in the evaluation mask.
+    assert not evaluator.evaluation_mask[noise_hole].any()
+    # The complement of the noise hole is fully evaluated.
+    expected = ref_mask & meas_mask
+    assert np.array_equal(evaluator.evaluation_mask, expected)
 
 
 def test_evaluation_mask_intersection_reference_and_resampled_measured():
@@ -286,7 +417,7 @@ def test_evaluation_mask_intersection_reference_and_resampled_measured():
     evaluator = GammaMapEvaluator(
         reference_sar_linear=ref_img,
         measured_sar_linear=meas_img,
-        measured_to_reference_transform=_identity_transform(),
+        reference_to_measured_transform=_identity_transform(),
         dose_to_agreement_percent=5.0,
         distance_to_agreement_mm=2.0,
     )

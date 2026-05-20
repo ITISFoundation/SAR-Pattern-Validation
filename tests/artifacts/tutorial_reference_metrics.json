@@ -5,10 +5,10 @@
     "reference_csv": "data/example/reference_sSAR1g.csv"
   },
   "expected": {
-    "evaluated_pixel_count": 13884,
+    "evaluated_pixel_count": 11452,
     "failed_pixel_count": 0,
     "pass_rate_percent": 100.0,
-    "passed_pixel_count": 13884
+    "passed_pixel_count": 11452
   },
   "inputs": {
     "distance_to_agreement_mm": 2.0,

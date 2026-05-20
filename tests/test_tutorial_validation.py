@@ -42,8 +42,7 @@ def _write_gamma_field(gamma_map: np.ndarray, evaluation_mask: np.ndarray) -> No
     )
 
 
-@pytest.mark.integration
-@pytest.mark.slow
+@pytest.mark.validation
 def test_tutorial_dataset_metrics_match_reference_artifact() -> None:
     artifact = _load_artifact()
     dataset = artifact["dataset"]
@@ -74,23 +73,23 @@ def test_tutorial_dataset_metrics_match_reference_artifact() -> None:
         )
 
     registration = Rigid2DRegistration(
-        fixed_image=reference_db,
-        moving_image=measured_db,
+        fixed_image=measured_db,
+        moving_image=reference_db,
         transform_type=Transform2D(inputs["transform_type"]),
     )
-    aligned_image, measured_to_reference_tx = registration.run(
+    aligned_image, reference_to_measured_tx = registration.run(
         stages=inputs["registration_stages"],
-        fixed_mask=reference_mask_u8,
-        moving_mask=None,
+        fixed_mask=None,
+        moving_mask=reference_mask_u8,
     )
 
     if save_plots:
         loader.plot_aligned(
             aligned_image,
-            aligned_meas_save_path=PLOT_DIR / "02_registered_measured.png",
+            aligned_meas_save_path=PLOT_DIR / "02_registered_simulated.png",
         )
         show_registration_overlay(
-            fixed_image=reference_db,
+            fixed_image=measured_db,
             aligned_moving_image=aligned_image,
             image_save_path=PLOT_DIR / "02_registration_overlay.png",
             title="Registration Overlay (tutorial)",
@@ -99,7 +98,7 @@ def test_tutorial_dataset_metrics_match_reference_artifact() -> None:
     evaluator = GammaMapEvaluator(
         reference_sar_linear=loader.reference_image_linear,
         measured_sar_linear=loader.measured_image_linear,
-        measured_to_reference_transform=measured_to_reference_tx,
+        reference_to_measured_transform=reference_to_measured_tx,
         dose_to_agreement_percent=inputs["dose_to_agreement_percent"],
         distance_to_agreement_mm=inputs["distance_to_agreement_mm"],
         gamma_cap=inputs["gamma_cap"],
