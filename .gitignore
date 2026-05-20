@@ -34,6 +34,7 @@ Thumbs.db
 .coverage
 .coverage.*
 coverage.xml
+coverage-validation.xml
 htmlcov/
 
 # ---- Artifacts ----
@@ -41,8 +42,15 @@ htmlcov/
 !assets/*.png
 !report_template/**/*.png
 *.log
+!tests/artifacts/**/logs/
 .codex
 *.zip
 .serena
 .claude
 test-artifacts/
+tests/artifacts/playwright/
+.agents/skills/backprop/SKILL.md
+.agents/skills/caveman/SKILL.md
+.agents/skills/check/SKILL.md
+.agents/skills/spec/SKILL.md
+skills-lock.json

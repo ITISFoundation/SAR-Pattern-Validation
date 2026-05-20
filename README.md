@@ -99,6 +99,14 @@ make measurement-validation
 
 The slow integration and validation tests that read `data/database/` or `data/measurements/` also require `git lfs pull`.
 
+After the validation suite has run, generate an interactive HTML dashboard from the per-frequency JSON reports:
+
+```bash
+python scripts/measurement_validation/generate_and_open_measurement_validation_dashboard.py
+```
+
+See [scripts/measurement_validation/MEASUREMENT_VALIDATION_TESTING.md](scripts/measurement_validation/MEASUREMENT_VALIDATION_TESTING.md) for the full guide: smart rerun, artifact regeneration, plot saving, and direct HTML generation.
+
 ---
 
 ### Key Parameters

@@ -596,7 +596,9 @@ def test_uploading_new_data_clears_prior_results(voila_page, tmp_path: Path) -> 
 
 _MEAS_X_DEFAULT = 0.0
 _MEAS_Y_DEFAULT = 0.0
-_MEAS_Y_MIN = 22.01
+_MEAS_Y_MIN = 50.01
+
+_FAST_TRACK_PASS_POWER_DBM = 21.0
 
 
 def _meas_area_input(voila_page, label_fragment: str):
@@ -651,26 +653,26 @@ def _click_run_expect_error(voila_page, error_fragment: str) -> None:
 
 
 class TestMeasurementAreaInputs:
-    def test_measurement_area_between_0_and_22_shows_error(self, voila_page) -> None:
-        _log(">> test_measurement_area_between_0_and_22_shows_error")
+    def test_measurement_area_between_1_and_49_shows_error(self, voila_page) -> None:
+        _log(">> test_measurement_area_between_1_and_49_shows_error")
         _ensure_run_button_enabled(voila_page)
-        _set_meas_area(voila_page, 15, 15)
-        _click_run_expect_error(voila_page, "Measurement area must be > 22 mm")
-        _log("<< test_measurement_area_between_0_and_22_shows_error: pass")
+        _set_meas_area(voila_page, 30, 30)
+        _click_run_expect_error(voila_page, "Measurement area must be >= 50 mm")
+        _log("<< test_measurement_area_between_1_and_49_shows_error: pass")
 
-    def test_measurement_area_exactly_22_shows_error(self, voila_page) -> None:
-        _log(">> test_measurement_area_exactly_22_shows_error")
+    def test_measurement_area_exactly_49_shows_error(self, voila_page) -> None:
+        _log(">> test_measurement_area_exactly_49_shows_error")
         _ensure_run_button_enabled(voila_page)
-        _set_meas_area(voila_page, 22, 22)
-        _click_run_expect_error(voila_page, "Measurement area must be > 22 mm")
-        _log("<< test_measurement_area_exactly_22_shows_error: pass")
+        _set_meas_area(voila_page, 49, 49)
+        _click_run_expect_error(voila_page, "Measurement area must be >= 50 mm")
+        _log("<< test_measurement_area_exactly_49_shows_error: pass")
 
-    def test_measurement_area_y_below_22_shows_error(self, voila_page) -> None:
-        _log(">> test_measurement_area_y_below_22_shows_error")
+    def test_measurement_area_y_below_50_shows_error(self, voila_page) -> None:
+        _log(">> test_measurement_area_y_below_50_shows_error")
         _ensure_run_button_enabled(voila_page)
-        _set_meas_area(voila_page, 30, 15)
-        _click_run_expect_error(voila_page, "Measurement area must be > 22 mm")
-        _log("<< test_measurement_area_y_below_22_shows_error: pass")
+        _set_meas_area(voila_page, 100, 30)
+        _click_run_expect_error(voila_page, "Measurement area must be >= 50 mm")
+        _log("<< test_measurement_area_y_below_50_shows_error: pass")
 
     def test_measurement_area_x_accepts_upper_bound_600(self, voila_page) -> None:
         _log(">> test_measurement_area_x_accepts_upper_bound_600")
@@ -727,7 +729,7 @@ class TestMeasurementAreaInputs:
         run_btn.click()
         _wait_for_workflow_cycle(voila_page)
         assert (
-            "Measurement area must be > 22 mm"
+            "Measurement area must be >= 50 mm"
             not in voila_page.locator("body").inner_text()
         )
         _log("<< test_measurement_area_zero_auto_allows_run: pass")
@@ -858,3 +860,227 @@ def test_mask_too_small_shows_error_banner(voila_page, tmp_path) -> None:
     assert "22 mm" in body_text, "Expected '22 mm' in MASK_TOO_SMALL error text"
 
     _log("<< test_mask_too_small_shows_error_banner: pass")
+
+
+def test_result_table_clears_on_rerun_then_repopulates(voila_page) -> None:
+    """Result table must disappear when a new run starts and reappear when done.
+
+    Bug: on the second Compare Patterns click the images are cleared but the
+    result table keeps showing stale data from the previous run.  Fix: set
+    result_table.value = "" at the top of handle_button_click, before
+    update_images(no_data=True).
+    """
+    _log(">> test_result_table_clears_on_rerun_then_repopulates")
+
+    # Restore valid CSV so the run can succeed.
+    if _UPLOAD_CSV_PATH.name not in voila_page.locator("body").inner_text():
+        _upload_file(voila_page, _UPLOAD_CSV_PATH)
+    _ensure_run_button_enabled(voila_page)
+    _set_meas_area(voila_page, 0, 0)
+
+    run_btn = voila_page.locator("button:has-text('Compare Patterns')")
+
+    # First run: produce a result table with content.
+    run_btn.click()
+    _wait_for_workflow_cycle(voila_page)
+    first_html = voila_page.content()
+    assert "Reference, 30 dBm" in first_html, (
+        "Prerequisite: first run must produce a result table"
+    )
+    _log("   first run complete — result table confirmed")
+
+    # Force a different run key so the second click triggers a full rerun
+    # (not the 'already match' early return).  Toggling noise_floor briefly
+    # changes the key and restores it so the test leaves the page clean.
+    # Use 0.03: the widget max is 0.05 so 0.06 would clamp to 0.05 (= same key).
+    _set_noise_floor(voila_page, 0.03)
+
+    # Second run: click and immediately check the table clears while running.
+    _log("   clicking Compare Patterns for second run")
+    run_btn.click()
+
+    _FIND_BTN = (
+        "() => [...document.querySelectorAll('button')]"
+        ".find(b => b.textContent.includes('Compare Patterns'))"
+    )
+    voila_page.wait_for_function(
+        f"() => {{ const b = ({_FIND_BTN})(); return b && b.disabled; }}",
+        timeout=10_000,
+    )
+    _log("   run started — asserting result table is now empty")
+    table_html = voila_page.locator("body").inner_html()
+    assert "Reference, 30 dBm" not in table_html, (
+        "Result table must be cleared when a rerun starts "
+        "(found stale 'Reference, 30 dBm' header while button was disabled)"
+    )
+
+    # Wait for run to finish and confirm table repopulates.
+    _wait_for_workflow_cycle(voila_page)
+    second_html = voila_page.content()
+    assert "Reference, 30 dBm" in second_html, (
+        "Result table must repopulate after the rerun completes"
+    )
+    _log("   result table repopulated after second run")
+
+    # Restore noise floor for subsequent tests.
+    _set_noise_floor(voila_page, _NOISE_FLOOR_DEFAULT)
+    _log("<< test_result_table_clears_on_rerun_then_repopulates: pass")
+
+
+# ---------------------------------------------------------------------------
+# V12 / B11: fast-track power-level rescale must update Measured@30dBm and
+# Scaling Error, not just the first column. Both tests below are E2E gates
+# for §V12 and will FAIL until the B11 fix lands in voila.ipynb.
+# ---------------------------------------------------------------------------
+
+
+def _extract_pssar_result(page_html: str) -> str:
+    """Return 'Pass' or 'Fail' for the psSAR result badge in the result table."""
+    match = re.search(
+        r"Reference, 30 dBm</th>.*?(Pass|Fail)",
+        page_html,
+        flags=re.S,
+    )
+    assert match is not None, "Could not find psSAR Pass/Fail badge in page HTML"
+    return match.group(1)
+
+
+def test_fast_track_wrong_power_after_success_shows_failure(voila_page) -> None:
+    """V12 / B11: wrong power via fast-track must update Measured@30dBm and Scaling Error → Fail.
+
+    At 1 dBm the normalization factor is 10^(20/10) = 100× larger than at 21 dBm,
+    so Measured@30dBm balloons and Scaling Error far exceeds ±10 % → psSAR Fail.
+    The bug: _update_analytical_results receives stale workflow_results (computed at
+    21 dBm) so the second and third columns are frozen and the badge stays Pass.
+    """
+    _log(">> test_fast_track_wrong_power_after_success_shows_failure")
+
+    # Upload the original valid CSV (prior test left a tiny CSV — this forces a
+    # full workflow run, not a fast-track, for the 28 dBm baseline below).
+    if _UPLOAD_CSV_PATH.name not in voila_page.locator("body").inner_text():
+        _upload_file(voila_page, _UPLOAD_CSV_PATH)
+    _ensure_run_button_enabled(voila_page)
+    run_btn = voila_page.locator("button:has-text('Compare Patterns')")
+
+    # Baseline: full run at 28 dBm (data is calibrated for this power).
+    _set_power_level(voila_page, _FAST_TRACK_PASS_POWER_DBM)
+    _log(f"   baseline full run at {_FAST_TRACK_PASS_POWER_DBM} dBm")
+    run_btn.click()
+    _wait_for_workflow_cycle(voila_page)
+
+    baseline = _extract_pssar_row_values(voila_page.content())
+    _log(
+        f"   baseline: measured_30dbm={baseline.measured_30dbm:.3f} W/kg, "
+        f"scaling_error={baseline.scaling_error:.1f}%"
+    )
+    assert abs(baseline.scaling_error) <= 25.0, (
+        f"Baseline run at {_FAST_TRACK_PASS_POWER_DBM} dBm must pass psSAR "
+        f"(scaling_error={baseline.scaling_error:.1f}%). "
+        "If the example data requires a different power, update _FAST_TRACK_PASS_POWER_DBM."
+    )
+
+    # Fast-track at 1 dBm (20 dBm below baseline → Measured@30dBm grows 100×).
+    _set_power_level(voila_page, 1.0)
+    _log("   fast-track at wrong power 1 dBm")
+    run_btn.click()
+    voila_page.wait_for_function(
+        "() => document.body.innerText.includes('Power level updated')",
+        timeout=10_000,
+    )
+    _log("   'Power level updated' banner confirmed")
+
+    after = _extract_pssar_row_values(voila_page.content())
+    _log(
+        f"   after wrong power: measured_30dbm={after.measured_30dbm:.3f} W/kg, "
+        f"scaling_error={after.scaling_error:.1f}%"
+    )
+
+    # V12: Measured@30dBm must increase substantially (bug: it stays frozen).
+    assert after.measured_30dbm > baseline.measured_30dbm * 10, (
+        f"Measured@30dBm must grow when power drops {_FAST_TRACK_PASS_POWER_DBM}→1 dBm via fast-track "
+        f"(before={baseline.measured_30dbm:.3f}, after={after.measured_30dbm:.3f})"
+    )
+    # V12: Scaling error must now far exceed ±25 % → Fail.
+    assert abs(after.scaling_error) > 25.0, (
+        f"Scaling error must exceed ±25 % at wrong power 1 dBm "
+        f"(got {after.scaling_error:.1f}%)"
+    )
+    assert _extract_pssar_result(voila_page.content()) == "Fail", (
+        "psSAR badge must be Fail when power level change causes huge scaling error"
+    )
+    _log("<< test_fast_track_wrong_power_after_success_shows_failure: pass")
+
+
+def test_fast_track_fix_power_restores_pass(voila_page) -> None:
+    """V12 / B11: correcting power level via fast-track must restore psSAR Pass.
+
+    Sequence: full run at 1 dBm (wrong) → Fail; fast-track to 21 dBm (correct) → Pass.
+    To force the wrong-power run to be a full workflow (not a fast-track from the
+    previous test), we use a slightly different noise_floor (0.06 instead of 0.05)
+    so the run key does not match.  After asserting the fix we restore noise_floor.
+    The bug: fast-track keeps stale scaling_error so the badge stays Fail even after
+    the correct power is entered.
+    """
+    _log(">> test_fast_track_fix_power_restores_pass")
+
+    if _UPLOAD_CSV_PATH.name not in voila_page.locator("body").inner_text():
+        _upload_file(voila_page, _UPLOAD_CSV_PATH)
+    _ensure_run_button_enabled(voila_page)
+    run_btn = voila_page.locator("button:has-text('Compare Patterns')")
+
+    # Full run at wrong power using noise_floor=0.03 so the run key differs from
+    # any prior fast-track entry (which used 0.05) — guarantees a full workflow.
+    # Use 0.03, not 0.06: the widget max is 0.05 so 0.06 would clamp to 0.05 (= same key).
+    _set_noise_floor(voila_page, 0.03)
+    _set_power_level(voila_page, 1.0)
+    _log("   full run at wrong power 1 dBm (noise_floor=0.03)")
+    run_btn.click()
+    _wait_for_workflow_cycle(voila_page)
+
+    wrong = _extract_pssar_row_values(voila_page.content())
+    _log(
+        f"   wrong power run: measured_30dbm={wrong.measured_30dbm:.3f} W/kg, "
+        f"scaling_error={wrong.scaling_error:.1f}%"
+    )
+    assert abs(wrong.scaling_error) > 25.0, (
+        f"Run at 1 dBm must fail psSAR (scaling_error={wrong.scaling_error:.1f}%)"
+    )
+    assert _extract_pssar_result(voila_page.content()) == "Fail", (
+        "psSAR badge must be Fail at wrong power 1 dBm"
+    )
+
+    # Fast-track to correct power (noise_floor stays 0.06 — only power changes).
+    _set_power_level(voila_page, _FAST_TRACK_PASS_POWER_DBM)
+    _log(f"   fast-track to correct power {_FAST_TRACK_PASS_POWER_DBM} dBm")
+    run_btn.click()
+    voila_page.wait_for_function(
+        "() => document.body.innerText.includes('Power level updated')",
+        timeout=10_000,
+    )
+    _log("   'Power level updated' banner confirmed")
+
+    fixed = _extract_pssar_row_values(voila_page.content())
+    _log(
+        f"   after fix: measured_30dbm={fixed.measured_30dbm:.3f} W/kg, "
+        f"scaling_error={fixed.scaling_error:.1f}%"
+    )
+
+    # V12: Measured@30dBm must shrink substantially (bug: it stays frozen at huge value).
+    assert fixed.measured_30dbm < wrong.measured_30dbm / 10, (
+        f"Measured@30dBm must decrease when power rises from 1→{_FAST_TRACK_PASS_POWER_DBM} dBm via fast-track "
+        f"(before={wrong.measured_30dbm:.3f}, after={fixed.measured_30dbm:.3f})"
+    )
+    # V12/V18: Scaling error must now be within ±25 % (Pass).
+    assert abs(fixed.scaling_error) <= 25.0, (
+        f"Scaling error must be within ±25 % at correct power {_FAST_TRACK_PASS_POWER_DBM} dBm "
+        f"(got {fixed.scaling_error:.1f}%)"
+    )
+    assert _extract_pssar_result(voila_page.content()) == "Pass", (
+        f"psSAR badge must be Pass when power level is corrected to {_FAST_TRACK_PASS_POWER_DBM} dBm"
+    )
+    body_text = voila_page.locator("body").inner_text()
+    assert "Pass rate" in body_text, "Gamma pattern pass-rate section must be present"
+
+    # Restore noise_floor to default so subsequent tests are not affected.
+    _set_noise_floor(voila_page, _NOISE_FLOOR_DEFAULT)
+    _log("<< test_fast_track_fix_power_restores_pass: pass")

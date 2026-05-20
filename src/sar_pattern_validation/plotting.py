@@ -74,8 +74,8 @@ def show_registration_overlay(
             xlim=(config.window_mm[0], config.window_mm[1]),
             ylim=(config.window_mm[2], config.window_mm[3]),
         )
-        ax.set_xlabel("$x_e$ (mm)")
-        ax.set_ylabel("$y_e$ (mm)")
+        ax.set_xlabel("$x'_r$ (mm)")
+        ax.set_ylabel("$y'_r$ (mm)")
 
         noise_floor_handle = _overlay_noise_floor(
             ax,
@@ -166,7 +166,7 @@ def plot_loaded_images(
             if sar_im is None:
                 sar_im = im
 
-        if image_save_path is not None and sar_im is not None:
+        if image_save_path is not None and sar_im is not None and config.save_colorbars:
             colorbar_path = _derive_colorbar_path(image_save_path, "sar_colorbar")
             _save_colorbar_only(
                 sar_im,
@@ -230,7 +230,7 @@ def plot_sar_image(
         )
         _apply_overlay_legend(ax, [noise_floor_handle, cropped_handle], config)
 
-        if show_colorbar and save_path is not None:
+        if show_colorbar and save_path is not None and config.save_colorbars:
             colorbar_path = _derive_colorbar_path(save_path, "colorbar")
             _save_colorbar_only(
                 im,
@@ -381,7 +381,7 @@ def _overlay_noise_floor(
     return mpatches.Patch(
         color=config.noise_floor_color,
         alpha=0.45,
-        label="Below noise floor",
+        label="Noise",
     )
 
 
@@ -395,7 +395,13 @@ def _apply_overlay_legend(
     filtered = [h for h in handles if h is not None]
     if not filtered:
         return
-    legend = ax.legend(handles=filtered, loc="lower right", frameon=True, fontsize=9)
+    legend = ax.legend(
+        handles=filtered,
+        loc="lower right",
+        frameon=True,
+        fontsize=7,
+        framealpha=0.0,
+    )
     if on_dark_axes:
         legend.get_frame().set_facecolor(config.dark_axes_facecolor)
         legend.get_frame().set_edgecolor("w")
@@ -439,8 +445,8 @@ def plot_gamma_results(
         ax.set_title(_two_line_title("Gamma Index"))
         ax.set_xlim(config.window_mm[0], config.window_mm[1])
         ax.set_ylim(config.window_mm[2], config.window_mm[3])
-        ax.set_xlabel("$x_e$ (mm)")
-        ax.set_ylabel("$y_e$ (mm)")
+        ax.set_xlabel("$x'_r$ (mm)")
+        ax.set_ylabel("$y'_r$ (mm)")
         _overlay_measurement_limit_mask(ax, config)
         noise_floor_handle = _overlay_noise_floor(
             ax,
@@ -450,7 +456,7 @@ def plot_gamma_results(
         )
         _apply_overlay_legend(ax, [noise_floor_handle], config)
         fig.tight_layout()
-        if gamma_image_save_path is not None:
+        if gamma_image_save_path is not None and config.save_colorbars:
             colorbar_path_v = _derive_colorbar_path(
                 gamma_image_save_path, "colorbar_vertical"
             )
@@ -504,8 +510,8 @@ def plot_gamma_results(
         ax.set_title(_two_line_title("Gamma Pass / Fail Map"))
         ax.set_xlim(config.window_mm[0], config.window_mm[1])
         ax.set_ylim(config.window_mm[2], config.window_mm[3])
-        ax.set_xlabel("$x_e$ (mm)")
-        ax.set_ylabel("$y_e$ (mm)")
+        ax.set_xlabel("$x'_r$ (mm)")
+        ax.set_ylabel("$y'_r$ (mm)")
         _overlay_measurement_limit_mask(ax, config)
         noise_floor_handle = _overlay_noise_floor(
             ax,
@@ -514,16 +520,14 @@ def plot_gamma_results(
             config=config,
         )
         handles = [
-            mpatches.Patch(
-                facecolor=mpl.colormaps["gray"](0.85), edgecolor="k", label="Pass"
-            ),
+            mpatches.Patch(facecolor="white", edgecolor="k", label="Pass"),
             mpatches.Patch(
                 facecolor=mpl.colormaps["Reds"](0.8), edgecolor="k", label="Fail"
             ),
         ]
         if noise_floor_handle is not None:
             handles.append(noise_floor_handle)
-        ax.legend(handles=handles, loc="lower right")
+        ax.legend(handles=handles, loc="lower right", fontsize=7, framealpha=0.0)
         fig.tight_layout()
         _save_or_show(fig, failure_image_save_path, config)
 

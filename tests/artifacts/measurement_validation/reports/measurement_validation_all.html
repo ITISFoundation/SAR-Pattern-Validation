@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Measurement Validation Dashboard</title>
+<style>
+
+        :root {
+            --bg: #0f172a;
+            --panel: #f8fafc;
+            --ink: #0b1020;
+            --brand: #0ea5e9;
+            --ok: #15803d;
+            --warn: #b45309;
+            --bad: #b91c1c;
+        }
+        body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background: radial-gradient(circle at top, #1e293b, var(--bg)); color: var(--ink); }
+        .wrap { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        .panel { background: var(--panel); border-radius: 14px; padding: 20px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+        h1 { margin: 0 0 8px 0; }
+        .muted { color: #4b5563; font-size: 13px; }
+        .cards { margin-top: 16px; display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+        .card { background: #e2e8f0; border-radius: 10px; padding: 12px; }
+        .card .label { font-size: 12px; text-transform: uppercase; color: #334155; }
+        .card .value { font-size: 28px; font-weight: 700; }
+        .ok { color: var(--ok); }
+        .bad { color: var(--bad); }
+        .warn { color: var(--warn); }
+        .controls { margin: 18px 0; display: grid; gap: 10px; }
+        .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+        .chip { border: 1px solid #cbd5e1; background: white; padding: 6px 10px; border-radius: 999px; cursor: pointer; font-size: 13px; }
+        .chip.active { background: #bae6fd; border-color: #7dd3fc; }
+        .status-row label { margin-right: 14px; font-size: 14px; }
+        .section { margin-top: 18px; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+        .section h2 { margin: 0; padding: 12px 14px; background: #f1f5f9; font-size: 18px; display: flex; justify-content: space-between; align-items: center; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px 10px; border-top: 1px solid #e5e7eb; font-size: 13px; text-align: left; }
+        th { background: #f8fafc; position: sticky; top: 0; }
+        .badge { border-radius: 999px; padding: 2px 8px; font-weight: 700; font-size: 11px; text-transform: uppercase; }
+        .badge.passed { background: #dcfce7; color: #166534; }
+        .badge.failed { background: #fee2e2; color: #991b1b; }
+        .badge.error { background: #fef3c7; color: #92400e; }
+        .small { font-size: 12px; color: #334155; }
+        .hide { display: none; }
+        ul.issues { list-style: none; margin: 4px 0 0 0; padding: 0; }
+        ul.issues li.issue { font-size: 12px; padding: 4px 8px; border-radius: 6px; margin-top: 4px; border-left: 3px solid #cbd5e1; }
+        ul.issues li.issue.error { background: #fef2f2; border-left-color: #b91c1c; color: #7f1d1d; }
+        ul.issues li.issue.warning { background: #fffbeb; border-left-color: #b45309; color: #78350f; }
+        ul.issues li.issue.info { background: #eff6ff; border-left-color: #2563eb; color: #1e3a8a; }
+        ul.issues .issue-code { font-weight: 700; margin-right: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+        @media (max-width: 900px) { .small-col { display: none; } }
+
+</style>
+</head>
+<body><div class='wrap'><div class='panel'>
+<h1>Measurement Validation Dashboard</h1>
+<div class='muted'>Sources: 1 JSON report(s). Cases shown: 110.</div>
+<div class='cards'>
+<div class='card'><div class='label'>Total Cases</div><div class='value'>110</div></div>
+<div class='card'><div class='label'>Passed</div><div class='value ok'>110</div></div>
+<div class='card'><div class='label'>Failed</div><div class='value bad'>0</div></div>
+<div class='card'><div class='label'>Errors</div><div class='value warn'>0</div></div>
+<div class='card'><div class='label'>Aggregate Pass Rate</div><div class='value good'>100.00%</div></div>
+<div class='card'><div class='label'>Combined Pass</div><div class='value ok'>110</div><div class='small'>scaling ≤ ±25% &amp; gamma ≥ 100%</div></div>
+</div>
+<div class='controls'>
+<div><strong>Frequency Toggles</strong></div>
+<div class='chip-row'>
+<button class='chip active' data-frequency='all'>All</button>
+<button class='chip' data-frequency='900mhz'>900 MHz</button>
+<button class='chip' data-frequency='1950mhz'>1.95 GHz</button>
+<button class='chip' data-frequency='2450mhz'>2.45 GHz</button>
+<button class='chip' data-frequency='5800mhz'>5.8 GHz</button>
+</div>
+<div><strong>dBm Toggles</strong></div>
+<div class='chip-row' id='dbm-chip-row'>
+<button class='chip active' data-dbm='all'>All</button>
+</div>
+<div class='status-row'><strong>Status Filters</strong><br>
+<label><input type='checkbox' class='status-filter' value='passed' checked> passed</label>
+<label><input type='checkbox' class='status-filter' value='failed' checked> failed</label>
+<label><input type='checkbox' class='status-filter' value='error' checked> error</label>
+</div></div>
+<section class='section' data-frequency-section='900mhz'>
+<h2><span>900 MHz</span><span class='small'>pass 18/18 | fail 0 | rate 100.00%</span></h2>
+<div style='overflow:auto; max-height: 62vh;'>
+<table><thead><tr>
+<th>Case ID</th><th>dBm</th><th>Distance</th><th>Mass</th><th>Noise Floor</th><th class='small-col'>Evaluated</th><th>Failed Pixels</th><th>Pass Rate</th><th>Scaling Err [%]</th><th class='small-col'>Source JSON</th>
+</tr></thead><tbody>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_10g_20dbm_1</code></td><td>20 dBm</td><td>15 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>4,140</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-12.04 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_10g_20dbm_2</code></td><td>20 dBm</td><td>15 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>4,116</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-11.90 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_10g_20dbm_3</code></td><td>20 dBm</td><td>15 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>3,998</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-12.76 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_10g_20dbm_4</code></td><td>20 dBm</td><td>15 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>3,810</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-11.75 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_10g_20dbm_5</code></td><td>20 dBm</td><td>15 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>3,305</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-11.47 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_10g_20dbm_6</code></td><td>20 dBm</td><td>15 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>2,816</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-11.90 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_10g_20dbm_7</code></td><td>20 dBm</td><td>15 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>3,070</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-12.33 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_10g_20dbm_8</code></td><td>20 dBm</td><td>15 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>2,797</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.75 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_10g_20dbm_9</code></td><td>20 dBm</td><td>15 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>2,068</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-11.04 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_1g_20dbm_1</code></td><td>20 dBm</td><td>15 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>4,856</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-8.65 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_1g_20dbm_2</code></td><td>20 dBm</td><td>15 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>4,840</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-7.46 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_1g_20dbm_3</code></td><td>20 dBm</td><td>15 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>4,566</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.57 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_1g_20dbm_4</code></td><td>20 dBm</td><td>15 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>4,260</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-8.56 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_1g_20dbm_5</code></td><td>20 dBm</td><td>15 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>3,782</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-6.54 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_1g_20dbm_6</code></td><td>20 dBm</td><td>15 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>3,261</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-4.71 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_1g_20dbm_7</code></td><td>20 dBm</td><td>15 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>3,447</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-8.93 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_1g_20dbm_8</code></td><td>20 dBm</td><td>15 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>2,994</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-7.46 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='900mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>900_15mm_1g_20dbm_9</code></td><td>20 dBm</td><td>15 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>2,280</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-7.46 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+</tbody></table></div></section>
+<section class='section' data-frequency-section='1950mhz'>
+<h2><span>1.95 GHz</span><span class='small'>pass 28/28 | fail 0 | rate 100.00%</span></h2>
+<div style='overflow:auto; max-height: 62vh;'>
+<table><thead><tr>
+<th>Case ID</th><th>dBm</th><th>Distance</th><th>Mass</th><th>Noise Floor</th><th class='small-col'>Evaluated</th><th>Failed Pixels</th><th>Pass Rate</th><th>Scaling Err [%]</th><th class='small-col'>Source JSON</th>
+</tr></thead><tbody>
+<tr data-frequency='1950mhz' data-dbm='4 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_10g_4dbm_13</code></td><td>4 dBm</td><td>10 mm</td><td>10g</td><td>0.01 W/kg</td><td class='small-col'>747</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-2.77 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='4 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_10g_4dbm_15</code></td><td>4 dBm</td><td>10 mm</td><td>10g</td><td>0.01 W/kg</td><td class='small-col'>779</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-2.77 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='4 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_10g_noisy</code></td><td>4 dBm</td><td>10 mm</td><td>10g</td><td>0.01 W/kg</td><td class='small-col'>758</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-8.49 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='4 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_1g_4dbm_13</code></td><td>4 dBm</td><td>10 mm</td><td>1g</td><td>0.01 W/kg</td><td class='small-col'>1,000</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>5.45 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='4 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_1g_4dbm_14</code></td><td>4 dBm</td><td>10 mm</td><td>1g</td><td>0.01 W/kg</td><td class='small-col'>1,047</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-7.36 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='4 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_1g_4dbm_15</code></td><td>4 dBm</td><td>10 mm</td><td>1g</td><td>0.01 W/kg</td><td class='small-col'>1,066</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-3.42 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='10 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_10g_10dbm_10</code></td><td>10 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>542</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-7.10 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='10 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_1g_10dbm_10</code></td><td>10 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>853</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-1.23 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='10 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_1g_10dbm_11</code></td><td>10 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>864</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-6.43 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='10 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_1g_10dbm_12</code></td><td>10 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>881</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-2.72 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_10g_20dbm_1</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>2,351</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-8.53 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_10g_20dbm_2</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>2,372</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-8.53 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_10g_20dbm_3</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>2,164</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-6.14 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_10g_20dbm_4</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>2,358</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-4.70 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_10g_20dbm_5</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>2,175</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-6.62 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_10g_20dbm_6</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>2,081</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-8.53 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_10g_20dbm_7</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,698</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-8.06 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_10g_20dbm_8</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,638</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-7.10 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_10g_20dbm_9</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,211</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-6.62 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_1g_20dbm_1</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>2,478</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-1.97 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_1g_20dbm_2</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>2,470</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-5.69 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_1g_20dbm_3</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>2,230</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-1.48 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_1g_20dbm_4</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>2,472</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-3.21 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_1g_20dbm_5</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>2,256</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-3.46 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_1g_20dbm_6</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>2,184</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-4.94 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_1g_20dbm_7</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,781</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-7.17 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_1g_20dbm_8</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,709</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-3.95 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='1950mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>1950_10mm_1g_20dbm_9</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,283</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-4.70 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+</tbody></table></div></section>
+<section class='section' data-frequency-section='2450mhz'>
+<h2><span>2.45 GHz</span><span class='small'>pass 48/48 | fail 0 | rate 100.00%</span></h2>
+<div style='overflow:auto; max-height: 62vh;'>
+<table><thead><tr>
+<th>Case ID</th><th>dBm</th><th>Distance</th><th>Mass</th><th>Noise Floor</th><th class='small-col'>Evaluated</th><th>Failed Pixels</th><th>Pass Rate</th><th>Scaling Err [%]</th><th class='small-col'>Source JSON</th>
+</tr></thead><tbody>
+<tr data-frequency='2450mhz' data-dbm='1 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_1dbm_17</code></td><td>1 dBm</td><td>10 mm</td><td>1g</td><td>0.01 W/kg</td><td class='small-col'>576</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-6.02 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='2 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_2dbm_16</code></td><td>2 dBm</td><td>10 mm</td><td>1g</td><td>0.01 W/kg</td><td class='small-col'>723</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>1.90 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='3 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_3dbm_15</code></td><td>3 dBm</td><td>10 mm</td><td>10g</td><td>0.01 W/kg</td><td class='small-col'>556</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.76 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='3 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_3dbm_15</code></td><td>3 dBm</td><td>10 mm</td><td>1g</td><td>0.01 W/kg</td><td class='small-col'>825</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-4.94 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='4 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_4dbm_14</code></td><td>4 dBm</td><td>10 mm</td><td>10g</td><td>0.01 W/kg</td><td class='small-col'>699</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-9.78 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='4 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_4dbm_14</code></td><td>4 dBm</td><td>10 mm</td><td>1g</td><td>0.01 W/kg</td><td class='small-col'>919</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-5.05 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='5 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_5dbm_13</code></td><td>5 dBm</td><td>10 mm</td><td>10g</td><td>0.01 W/kg</td><td class='small-col'>856</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-11.70 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='5 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_5dbm_13</code></td><td>5 dBm</td><td>10 mm</td><td>1g</td><td>0.01 W/kg</td><td class='small-col'>1,058</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-7.36 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='6 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_6dbm_12</code></td><td>6 dBm</td><td>10 mm</td><td>10g</td><td>0.01 W/kg</td><td class='small-col'>992</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.55 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='6 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_6dbm_12</code></td><td>6 dBm</td><td>10 mm</td><td>1g</td><td>0.01 W/kg</td><td class='small-col'>1,127</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-5.18 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='7 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_7dbm_11</code></td><td>7 dBm</td><td>10 mm</td><td>10g</td><td>0.01 W/kg</td><td class='small-col'>1,137</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.38 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='7 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_7dbm_11</code></td><td>7 dBm</td><td>10 mm</td><td>1g</td><td>0.01 W/kg</td><td class='small-col'>1,252</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-5.95 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='8 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_8dbm_10</code></td><td>8 dBm</td><td>10 mm</td><td>10g</td><td>0.01 W/kg</td><td class='small-col'>1,267</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-11.49 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='8 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_8dbm_10</code></td><td>8 dBm</td><td>10 mm</td><td>1g</td><td>0.01 W/kg</td><td class='small-col'>1,336</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-6.84 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='9 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_9dbm_9</code></td><td>9 dBm</td><td>10 mm</td><td>10g</td><td>0.01 W/kg</td><td class='small-col'>1,432</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.85 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='9 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_9dbm_9</code></td><td>9 dBm</td><td>10 mm</td><td>1g</td><td>0.01 W/kg</td><td class='small-col'>1,508</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-6.85 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='10 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_10dbm_8</code></td><td>10 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>528</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.57 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='10 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_10dbm_8</code></td><td>10 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>776</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-5.35 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='11 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_11dbm_7</code></td><td>11 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>664</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-11.28 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='11 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_11dbm_7</code></td><td>11 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>882</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-6.47 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='12 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_12dbm_6</code></td><td>12 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>819</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.89 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='12 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_12dbm_6</code></td><td>12 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>995</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-6.04 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='13 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_13dbm_5</code></td><td>13 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>971</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.56 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='13 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_13dbm_5</code></td><td>13 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,109</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-5.97 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='14 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_14dbm_4</code></td><td>14 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,105</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-11.88 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='14 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_14dbm_4</code></td><td>14 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,217</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-7.29 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='15 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_15dbm_3</code></td><td>15 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,246</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-11.70 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='15 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_15dbm_3</code></td><td>15 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,332</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-7.36 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='16 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_16dbm_2</code></td><td>16 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,407</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.96 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='16 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_16dbm_2</code></td><td>16 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,476</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-6.13 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_17dbm_1</code></td><td>17 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,541</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.38 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_17dbm_2</code></td><td>17 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,544</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.38 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_17dbm_3</code></td><td>17 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,550</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-12.80 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_17dbm_4</code></td><td>17 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,096</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-11.19 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_17dbm_5</code></td><td>17 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,542</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-9.57 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_17dbm_6</code></td><td>17 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,447</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.38 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_17dbm_7</code></td><td>17 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,559</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-12.80 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_17dbm_8</code></td><td>17 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,538</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.38 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_10g_17dbm_9</code></td><td>17 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,076</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-11.19 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_17dbm_1</code></td><td>17 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,612</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-7.45 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_17dbm_2</code></td><td>17 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,639</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.07 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_17dbm_3</code></td><td>17 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,615</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-13.82 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_17dbm_4</code></td><td>17 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,140</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-8.20 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_17dbm_5</code></td><td>17 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,620</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-6.70 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_17dbm_6</code></td><td>17 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,506</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-8.20 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_17dbm_7</code></td><td>17 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,625</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-12.32 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_17dbm_8</code></td><td>17 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,601</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.82 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='2450mhz' data-dbm='17 dBm' data-status='passed' data-combined='passed'><td><code>2450_10mm_1g_17dbm_9</code></td><td>17 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,132</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>-10.07 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+</tbody></table></div></section>
+<section class='section' data-frequency-section='5800mhz'>
+<h2><span>5.8 GHz</span><span class='small'>pass 16/16 | fail 0 | rate 100.00%</span></h2>
+<div style='overflow:auto; max-height: 62vh;'>
+<table><thead><tr>
+<th>Case ID</th><th>dBm</th><th>Distance</th><th>Mass</th><th>Noise Floor</th><th class='small-col'>Evaluated</th><th>Failed Pixels</th><th>Pass Rate</th><th>Scaling Err [%]</th><th class='small-col'>Source JSON</th>
+</tr></thead><tbody>
+<tr data-frequency='5800mhz' data-dbm='10 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_1g_10dbm_8</code></td><td>10 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>556</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>12.81 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='5800mhz' data-dbm='10 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_1g_10dbm_9</code></td><td>10 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>545</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>12.38 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='5800mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_10g_20dbm_1</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,417</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>12.55 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='5800mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_10g_20dbm_2</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,436</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>13.56 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='5800mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_10g_20dbm_3</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,424</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>11.53 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='5800mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_10g_20dbm_4</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,417</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>14.07 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='5800mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_10g_20dbm_5</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,436</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>15.59 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='5800mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_10g_20dbm_6</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>1,068</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>9.00 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='5800mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_10g_20dbm_7</code></td><td>20 dBm</td><td>10 mm</td><td>10g</td><td>0.05 W/kg</td><td class='small-col'>807</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>12.04 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='5800mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_1g_20dbm_1</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,641</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>10.97 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='5800mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_1g_20dbm_2</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,635</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>14.50 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='5800mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_1g_20dbm_3</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,665</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>9.13 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='5800mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_1g_20dbm_4</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,623</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>13.80 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='5800mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_1g_20dbm_5</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,674</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>16.20 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='5800mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_1g_20dbm_6</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>1,152</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>9.13 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+<tr data-frequency='5800mhz' data-dbm='20 dBm' data-status='passed' data-combined='passed'><td><code>5ghz_10mm_1g_20dbm_7</code></td><td>20 dBm</td><td>10 mm</td><td>1g</td><td>0.05 W/kg</td><td class='small-col'>905</td><td>0</td><td><span class='good'>100.00%</span> <span class='badge passed'>passed</span></td><td>11.53 <span class='badge passed'>passed</span></td><td class='small-col'>measurement_validation_all.json</td></tr>
+</tbody></table></div></section>
+<script>
+
+        const frequencyChips = Array.from(document.querySelectorAll('[data-frequency]'));
+        const dbmChipRow = document.getElementById('dbm-chip-row');
+        const statusChecks = Array.from(document.querySelectorAll('.status-filter'));
+        const rows = Array.from(document.querySelectorAll('tbody tr'));
+        const sections = Array.from(document.querySelectorAll('[data-frequency-section]'));
+
+        let activeFrequency = 'all';
+        let activeDbm = 'all';
+
+        function availableDbmForActiveFrequency() {
+            const set = new Set();
+            rows.forEach(row => {
+                const matchesFrequency = activeFrequency === 'all' || row.dataset.frequency === activeFrequency;
+                if (matchesFrequency) {
+                    set.add(row.dataset.dbm);
+                }
+            });
+            return Array.from(set).sort((a, b) => parseFloat(a) - parseFloat(b));
+        }
+
+        function rebuildDbmChips() {
+            const dbmOptions = availableDbmForActiveFrequency();
+            dbmChipRow.innerHTML = '';
+
+            const allBtn = document.createElement('button');
+            allBtn.className = 'chip' + (activeDbm === 'all' ? ' active' : '');
+            allBtn.dataset.dbm = 'all';
+            allBtn.textContent = 'All';
+            allBtn.addEventListener('click', () => {
+                activeDbm = 'all';
+                rebuildDbmChips();
+                applyFilters();
+            });
+            dbmChipRow.appendChild(allBtn);
+
+            dbmOptions.forEach(dbm => {
+                const btn = document.createElement('button');
+                btn.className = 'chip' + (activeDbm === dbm ? ' active' : '');
+                btn.dataset.dbm = dbm;
+                btn.textContent = dbm;
+                btn.addEventListener('click', () => {
+                    activeDbm = dbm;
+                    rebuildDbmChips();
+                    applyFilters();
+                });
+                dbmChipRow.appendChild(btn);
+            });
+
+            if (activeDbm !== 'all' && !dbmOptions.includes(activeDbm)) {
+                activeDbm = 'all';
+                rebuildDbmChips();
+            }
+        }
+
+        function selectedStatuses() {
+            return new Set(statusChecks.filter(c => c.checked).map(c => c.value));
+        }
+
+        function updateFrequencyChipStyles() {
+            frequencyChips.forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.frequency === activeFrequency);
+            });
+        }
+
+        function applyFilters() {
+            const statuses = selectedStatuses();
+            rows.forEach(row => {
+                const freq = row.dataset.frequency;
+                const dbm = row.dataset.dbm;
+                const status = row.dataset.status;
+                const freqVisible = activeFrequency === 'all' || activeFrequency === freq;
+                const dbmVisible = activeDbm === 'all' || activeDbm === dbm;
+                const statusVisible = statuses.has(status);
+                row.classList.toggle('hide', !(freqVisible && dbmVisible && statusVisible));
+            });
+
+            sections.forEach(section => {
+                const freq = section.dataset.frequencySection;
+                const visibleRows = section.querySelectorAll('tbody tr:not(.hide)').length;
+                const sectionVisible = (activeFrequency === 'all' || activeFrequency === freq) && visibleRows > 0;
+                section.classList.toggle('hide', !sectionVisible);
+            });
+        }
+
+        frequencyChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                activeFrequency = chip.dataset.frequency;
+                activeDbm = 'all';
+                updateFrequencyChipStyles();
+                rebuildDbmChips();
+                applyFilters();
+            });
+        });
+
+        statusChecks.forEach(check => check.addEventListener('change', applyFilters));
+
+        updateFrequencyChipStyles();
+        rebuildDbmChips();
+        applyFilters();
+
+</script>
+</div></div></body></html>

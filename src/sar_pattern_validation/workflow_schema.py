@@ -95,7 +95,7 @@ class WorkflowConfigSchema(BaseModel):
     gamma_comparison_image_path: str | None = None
 
     resample_resolution: float | None = Field(default=None, gt=0)
-    noise_floor: float = Field(default=DEFAULT_NOISE_FLOOR, gt=0)
+    noise_floor: float = Field(default=DEFAULT_NOISE_FLOOR, ge=0)
     show_plot: bool = DEFAULT_SHOW_PLOT
     render_plots: bool = DEFAULT_RENDER_PLOTS
 

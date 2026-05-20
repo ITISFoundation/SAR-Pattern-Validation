@@ -81,6 +81,7 @@ class WorkflowResult:
     reference_image_path: Path | None
     measured_image_path: Path | None
     aligned_measured_path: Path | None
+    measured_peak_wkg: float
     measured_pssar: float
     reference_pssar: float
     scaling_error: float
@@ -215,6 +216,8 @@ def _complete_workflow(config: WorkflowConfig) -> WorkflowResult:
             noise_floor_wkg=config.noise_floor,
             show_plot=False,
             warn=True,
+            measurement_area_x_mm=config.measurement_area_x_mm,
+            measurement_area_y_mm=config.measurement_area_y_mm,
         )
 
         reference_db, measured_db = loader.get_images()
@@ -297,7 +300,8 @@ def _complete_workflow(config: WorkflowConfig) -> WorkflowResult:
                     f"Noise-filtered measured mask (pre-registration) does not contain a "
                     f"{config.min_inscribed_square_mm:.0f} mm × "
                     f"{config.min_inscribed_square_mm:.0f} mm axis-aligned inscribed "
-                    f"square. The gamma comparison is invalid."
+                    f"square. The gamma comparison is invalid. "
+                    f"If the mask is small due to noise filtering, try lowering the noise floor threshold."
                 ),
             )
             raise WorkflowExecutionError(_issue.message, issue=_issue)
@@ -404,7 +408,8 @@ def _complete_workflow(config: WorkflowConfig) -> WorkflowResult:
                     f"Gamma evaluation mask does not contain a "
                     f"{config.min_inscribed_square_mm:.0f} mm × "
                     f"{config.min_inscribed_square_mm:.0f} mm axis-aligned inscribed "
-                    f"square. The gamma comparison is invalid."
+                    f"square. The gamma comparison is invalid. "
+                    f"If the mask is small due to noise filtering, try lowering the noise floor threshold."
                 ),
             )
             raise WorkflowExecutionError(_issue.message, issue=_issue)
@@ -430,6 +435,7 @@ def _complete_workflow(config: WorkflowConfig) -> WorkflowResult:
             reference_image_path=reference_image_save_path,
             measured_image_path=measured_image_save_path,
             aligned_measured_path=aligned_meas_save_path,
+            measured_peak_wkg=loader.measured_peak,
             measured_pssar=loader.measured_peak_30dbm,
             reference_pssar=loader.reference_peak,
             scaling_error=loader.scaling_error,

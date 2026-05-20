@@ -35,10 +35,9 @@ DEFAULT_PLOT_WINDOW_MM: Final[tuple[float, float, float, float]] = (
     120.0,
 )
 
-# Measurement-area bounds (per MGD 2026-04-24 feedback). Inclusive upper bound,
-# exclusive lower bound — a 22 mm × 22 mm 10 g cube face must fit strictly
-# inside the area, so the area itself must exceed 22 mm on each axis.
-MEASUREMENT_AREA_MIN_MM_EXCLUSIVE: Final[float] = 22.0
+# Minimum measurement area: 50 mm on each axis (V14/V15 §B13).
+# 0 is reserved for "auto" (no crop); any non-zero value must be ≥ 50 mm.
+MEASUREMENT_AREA_MIN_MM_EXCLUSIVE: Final[float] = 50.0
 MEASUREMENT_AREA_MAX_X_MM: Final[float] = 600.0
 MEASUREMENT_AREA_MAX_Y_MM: Final[float] = 400.0
 DEFAULT_PLOT_FONT_SIZE: Final[float] = 14.0
@@ -99,6 +98,7 @@ class PlottingConfig:
     measurement_area_y_mm: float | None = None
     center_x_mm: float = 0.0
     center_y_mm: float = 0.0
+    save_colorbars: bool = True
 
 
 @dataclass

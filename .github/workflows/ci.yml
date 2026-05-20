@@ -191,7 +191,7 @@ jobs:
             --screenshot on \
             --video retain-on-failure \
             --tracing retain-on-failure \
-            --output /tmp/playwright-results \
+            --output tests/artifacts/playwright \
             tests/test_voila_e2e.py
 
       - name: Upload E2E artifacts
@@ -199,6 +199,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: playwright-results
-          path: /tmp/playwright-results/
+          path: tests/artifacts/playwright/
           if-no-files-found: ignore
           retention-days: 30

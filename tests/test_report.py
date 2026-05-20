@@ -35,6 +35,7 @@ def _make_workflow_result(
         reference_image_path=reference_image,
         measured_image_path=measured_image,
         aligned_measured_path=None,
+        measured_peak_wkg=0.246,
         measured_pssar=24.63,
         reference_pssar=24.71,
         scaling_error=-0.0035,  # -0.35 %

@@ -1,0 +1,36 @@
+{
+  "artifact_version": 1,
+  "dataset": {
+    "averaging_mass": "10g",
+    "distance_mm": 10,
+    "frequency_key": "2450mhz",
+    "frequency_label": "2.45 GHz",
+    "frequency_mhz": 2450,
+    "group_key": "2450mhz_17dbm",
+    "measured_csv": "data/measurements/D2450_Flat_10mm_17dBm_10g_8.csv",
+    "power_level_dbm": 17.0,
+    "power_level_key": "17dbm",
+    "reference_csv": "data/database/dipole_2450MHz_Flat_10mm_10g.csv",
+    "source_group": "expanded_measurements"
+  },
+  "expected": {
+    "evaluated_pixel_count": 1538,
+    "failed_pixel_count": 0,
+    "measured_pssar": 22.147411696154567,
+    "pass_rate_percent": 100.0,
+    "passed_pixel_count": 1538,
+    "reference_pssar": 24.712052085163776,
+    "scaling_error": -0.103780955955047
+  },
+  "inputs": {
+    "distance_to_agreement_mm": 3.0,
+    "dose_to_agreement_percent": 10.0,
+    "evaluation_roi_policy": "intersection",
+    "gamma_cap": 2.0,
+    "noise_floor_wkg": 0.05,
+    "power_level_dbm": 17.0
+  },
+  "success_thresholds": {
+    "require_zero_failed_pixels": true
+  }
+}

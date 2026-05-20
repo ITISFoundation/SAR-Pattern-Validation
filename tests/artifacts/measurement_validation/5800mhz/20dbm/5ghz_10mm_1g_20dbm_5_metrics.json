@@ -1,0 +1,36 @@
+{
+  "artifact_version": 1,
+  "dataset": {
+    "averaging_mass": "1g",
+    "distance_mm": 10,
+    "frequency_key": "5800mhz",
+    "frequency_label": "5.8 GHz",
+    "frequency_mhz": 5800,
+    "group_key": "5800mhz_20dbm",
+    "measured_csv": "data/measurements/D5GHz_Flat HSL_10 mm_20 dBm_1g_5.csv",
+    "power_level_dbm": 20.0,
+    "power_level_key": "20dbm",
+    "reference_csv": "data/database/dipole_5800MHz_Flat_10mm_1g.csv",
+    "source_group": "expanded_measurements"
+  },
+  "expected": {
+    "evaluated_pixel_count": 1674,
+    "failed_pixel_count": 0,
+    "measured_pssar": 82.10000000000001,
+    "pass_rate_percent": 100.0,
+    "passed_pixel_count": 1674,
+    "reference_pssar": 70.65244691346656,
+    "scaling_error": 0.16202627915426815
+  },
+  "inputs": {
+    "distance_to_agreement_mm": 3.0,
+    "dose_to_agreement_percent": 10.0,
+    "evaluation_roi_policy": "intersection",
+    "gamma_cap": 2.0,
+    "noise_floor_wkg": 0.05,
+    "power_level_dbm": 20.0
+  },
+  "success_thresholds": {
+    "require_zero_failed_pixels": true
+  }
+}

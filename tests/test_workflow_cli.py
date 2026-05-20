@@ -420,3 +420,27 @@ def test_cli_via_uvx_like_frontend(tmp_path: Path) -> None:
     assert registered_image_path.exists(), "Registered overlay image should be saved"
     assert measured_image_path.exists(), "Measured image should be saved"
     assert reference_image_path.exists(), "Reference image should be saved"
+
+
+@pytest.mark.validation
+def test_run_pipeline_main_runs_without_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Smoke-test that run_pipeline.main() completes without raising."""
+    import importlib.util
+
+    repo_root = Path(__file__).parent.parent
+
+    # run_pipeline.py uses relative paths (data/, results/); set up a working
+    # directory with a symlink to data/ and an empty results/ output dir.
+    (tmp_path / "data").symlink_to(repo_root / "data")
+    (tmp_path / "results").mkdir()
+    monkeypatch.chdir(tmp_path)
+
+    spec = importlib.util.spec_from_file_location(
+        "run_pipeline", repo_root / "scripts" / "run_pipeline.py"
+    )
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    mod.main()
