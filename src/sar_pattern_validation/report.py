@@ -1,15 +1,10 @@
 """
 Generate SAR Pattern Validation reports from workflow results.
 
-The report uses a two-level template structure:
-  - base_report/main.tex: the full validation report with an appendix
-    section "Tested Cases" where individual test-case pages are appended.
-  - tested_case_report_page/main.tex: a per-run template that is filled in
-    and inserted as a subsection for each workflow execution.
-
-On the first workflow run the base report is initialized into the output
-directory.  Subsequent runs append additional subsections to the existing
-main.tex in the same output directory.
+The report uses tested_case_report_page_new/main.tex as a standalone template.
+On the first workflow run the template main.tex is copied into the output
+directory.  Subsequent runs append additional test-case pages before the
+\\end{document} marker in the same output directory.
 
 Output path is exposed for [[Task 6.10 - User Report Download Button]] (MEST).
 """
@@ -39,8 +34,8 @@ TEMPLATE_FIGURE_MAPPING: dict[str, str] = {
     "reference_with_colorbar.png": "reference_image_path",
 }
 
-# Marker in the base_report main.tex where test-case content is inserted.
-_APPENDIX_END_MARKER = r"\end{appendix}"
+# Marker in main.tex where test-case content is inserted.
+_DOCUMENT_END_MARKER = r"\end{document}"
 
 
 def _set_latex_macro(text: str, name: str, value: str) -> str:
@@ -152,58 +147,46 @@ def _run_latex_cmd(cmd: list[str], cwd: Path, label: str) -> bool:
     return True
 
 
-def _initialize_base_report(output_dir: Path, template_dir: Path) -> None:
+def _initialize_report(output_dir: Path, template_dir: Path) -> None:
     """
-    Copy the base_report template into *output_dir* for the first workflow run.
+    Copy the report template into *output_dir* for the first workflow run.
 
-    Copies main.tex, bib.bib, class/, and figs/ so the report compiles
-    standalone from the output directory.
+    Only the package imports are kept; the sample macro definitions and document
+    body are stripped because the Python-rendered test cases provide all content
+    with values resolved inline.
     """
-    base_report_dir = template_dir / "base_report"
-    if not base_report_dir.is_dir():
-        raise FileNotFoundError(
-            f"Base report template directory not found: {base_report_dir}"
-        )
+    template_file = template_dir / "main.tex"
+    if not template_file.is_file():
+        raise FileNotFoundError(f"Report template not found: {template_file}")
 
-    # Copy main.tex
-    shutil.copy2(base_report_dir / "main.tex", output_dir / "main.tex")
+    template_text = template_file.read_text(encoding="utf-8")
 
-    # Copy bib and bst files
-    bib_src = base_report_dir / "bib.bib"
-    if bib_src.is_file():
-        shutil.copy2(bib_src, output_dir / "bib.bib")
-    bst_src = base_report_dir / "IEEE.bst"
-    if bst_src.is_file():
-        shutil.copy2(bst_src, output_dir / "IEEE.bst")
+    # Extract only the package/setup lines (up to "% input variables" comment
+    # or to \begin{document}), then write a minimal document shell.
+    lines = template_text.splitlines(keepends=True)
+    preamble_lines: list[str] = []
+    for line in lines:
+        # Stop before sample variable definitions
+        if line.strip().startswith("% input variables"):
+            break
+        preamble_lines.append(line)
 
-    # Copy class/ directory
-    class_src = base_report_dir / "class"
-    class_dst = output_dir / "class"
-    if class_src.is_dir():
-        if class_dst.exists():
-            shutil.rmtree(class_dst)
-        shutil.copytree(class_src, class_dst)
-
-    # Copy figs/ directory (static figures used in the base report)
-    figs_src = base_report_dir / "figs"
-    figs_dst = output_dir / "figs"
-    if figs_src.is_dir():
-        if figs_dst.exists():
-            shutil.rmtree(figs_dst)
-        shutil.copytree(figs_src, figs_dst)
+    preamble = "".join(preamble_lines)
+    report_text = preamble + "\n\\begin{document}\n\\end{document}\n"
+    (output_dir / "main.tex").write_text(report_text, encoding="utf-8")
 
 
 def _next_case_number(output_dir: Path) -> int:
     """Determine the next case number by counting existing case_* figure dirs."""
     figures_dir = output_dir / "figures"
     if not figures_dir.is_dir():
-        return 1
+        return 0
     existing = sorted(
         d.name
         for d in figures_dir.iterdir()
         if d.is_dir() and d.name.startswith("case_")
     )
-    return len(existing) + 1
+    return len(existing)
 
 
 def _render_test_case_body(
@@ -225,8 +208,18 @@ def _render_test_case_body(
     measured_filename = _latex_escape_filename(
         Path(workflow_config.measured_file_path).name
     )
-    power_level = f"{workflow_config.power_level_dbm:g}"
     noise_level = f"{workflow_config.noise_floor:g}"
+    measurement_area_x = (
+        f"{workflow_config.measurement_area_x_mm:g}"
+        if workflow_config.measurement_area_x_mm is not None
+        else "---"
+    )
+    measurement_area_y = (
+        f"{workflow_config.measurement_area_y_mm:g}"
+        if workflow_config.measurement_area_y_mm is not None
+        else "---"
+    )
+    pssar_measured = f"{workflow_result.measured_peak_wkg:.2f}"
     pssar_ref = f"{workflow_result.reference_pssar:.2f}"
     pssar_meas = f"{workflow_result.measured_pssar:.2f}"
     err_scale = f"{100.0 * workflow_result.scaling_error:.2f}"
@@ -237,70 +230,78 @@ def _render_test_case_body(
     # Resolve pass/fail conditional
     if pass_rate < 100.0:
         fail_rate = f"{100.0 - pass_rate:.1f}"
-        passfail = r"\textbf{Fail}"
-        statement = (
+        gamma_statement = (
             rf"The pattern validation fails because $\Gamma (x_e,y_e)~>~1.0$ "
-            rf"for {fail_rate}\,\% of the measured sSAR values, "
-            rf"$sSAR_{{en}}(x_e,y_e)$, compared to the reference, "
-            rf"$sSAR_{{rn}}(x'_r,y'_r)$,"
+            rf"at {fail_rate}\,\% of the locations of the measured sSAR "
+            rf"distribution compared to the reference, "
         )
     else:
-        passfail = r"\textbf{Pass}"
-        statement = (
+        gamma_statement = (
             r"The pattern validation passes because $\Gamma (x_e,y_e)~\leq~1.0$ "
-            r"for all of the measured sSAR values, "
-            r"$sSAR_{en}(x_e,y_e)$, compared to the reference, "
-            r"$sSAR_{rn}(x'_r,y'_r)$,"
+            r"at all locations of the measured sSAR distribution, "
+            r"compared to the reference, "
         )
 
-    subsection_title = (
-        f"{antenna_type.capitalize()}, {frequency_mhz}\\,MHz, "
-        f"{distance_mm}\\,mm, {mass_g}\\,g"
-    )
+    # Scaling error statement
+    err_scale_abs = abs(100.0 * workflow_result.scaling_error)
+    err_scale_tolerance = "25.0"
+    if err_scale_abs > float(err_scale_tolerance):
+        scale_statement = (
+            rf"The scaling error for the psSAR is outside the "
+            rf"$\pm$~{err_scale_tolerance}~\% criteria."
+        )
+    else:
+        scale_statement = (
+            rf"The scaling error for the psSAR is within the "
+            rf"$\pm$~{err_scale_tolerance}~\% criteria."
+        )
 
     # Build the LaTeX snippet for this test case
     content = rf"""
 \clearpage
 \FloatBarrier
-\subsection{{{subsection_title}}}
+\begin{{center}}
+    \section*{{SAR Pattern Assessment Report for IEC/IEEE PAS 62209-5}}
+    \today
+\end{{center}}
 
-File name with measurement, $sSAR_{{en}}(x_e,y_e)$: \texttt{{{measured_filename}}}
+\subsection*{{Measured sSAR Parameters}}
+
+File name: \texttt{{{measured_filename}}}\\
+Measurement area: ($x$, $y$) = ({measurement_area_x}~mm, {measurement_area_y}~mm).
 
 \begin{{table}}[htpb] \centering
-\begin{{tabular}}{{cccccc|ccc}}
-\textbf{{Power}} & \textbf{{Noise}} & \textbf{{Source}} &&& \textbf{{Avg.}}&\multicolumn{{2}}{{c}}{{\textbf{{psSAR at 30~dBm}}}}& \textbf{{Sampling}} \\
-\textbf{{Level}} & \textbf{{Level}} &\textbf{{Type}} & \textbf{{Freq.}} & \textbf{{Dist.}} & \textbf{{Mass}} & \textbf{{Measured}} & \textbf{{Reference}} & \textbf{{Error}} \\
-\textbf{{(dBm)}} & \textbf{{(W/kg)}} & & \textbf{{(MHz)}} & \textbf{{(mm)}} & \textbf{{(g)}} & \textbf{{(W/kg)}} & \textbf{{(W/kg)}} & \textbf{{(\%)}} \\\hline
-{power_level} & {noise_level} & {antenna_type} & {frequency_mhz} & {distance_mm} & {mass_g} & {pssar_meas} & {pssar_ref} & {err_scale} \\
+\begin{{tabular}}{{ccccc||cccc}}
+
+\textbf{{Source}} &\textbf{{Freq.}} & \textbf{{Dist.}} & \textbf{{Avg.}}& \textbf{{Noise}}& \textbf{{psSAR}} &\multicolumn{{2}}{{c}}{{\textbf{{psSAR at 30~dBm}}}}& \textbf{{Scaling}} \\
+\textbf{{Type}} & & & \textbf{{Mass}} & \textbf{{Floor}}& \textbf{{Meas.}}& \textbf{{Meas.}} & \textbf{{Ref.}} & \textbf{{Error}} \\
+& \textbf{{(MHz)}} & \textbf{{(mm)}} & \textbf{{(g)}} & \textbf{{(W/kg)}} &\textbf{{(W/kg)}} & \textbf{{(W/kg)}} & \textbf{{(W/kg)}} & \textbf{{(\%)}} \\\hline
+{antenna_type} & {frequency_mhz} & {distance_mm} & {mass_g} & {noise_level} & {pssar_measured} & {pssar_meas} & {pssar_ref} & {err_scale} \\
 \end{{tabular}}
 \end{{table}}
 
-\vspace{{-1em}}
 \FloatBarrier
-\subsubsection*{{Pattern Match Result: {passfail}}}
+\subsection*{{Results}}
 
-{statement} ~according to the Gamma criterion\footnote{{
-\[
-\Gamma (x_e, y_e) = \min_{{x'_r,y'_r}}\Bigg(\sqrt{{\frac{{(x_e-x'_r)^2+(y_e-y'_r)^2}}{{\Delta d^2}}+\frac{{(sSAR_{{en}}(x_e,y_e)-sSAR_{{rn}}(x'_r,y'_r))^2}}{{\Delta D^2}}}}\Bigg)
-\]
-}} with $\Delta D = ${delta_dose}, $\Delta d$ = {delta_dist}. See IEC/IEEE PAS 62209-5 for details.
+{gamma_statement} ~according to the Gamma criterion described in IEC/IEEE PAS 62209-5
+with $\Delta D~=~${delta_dose}, $\Delta d$~=~{delta_dist}. {scale_statement}
 
-\vspace{{-0.5em}}
-\begin{{center}}
-\begin{{tabular}}{{c}}
-  \includegraphics[width=.42\linewidth]{{{figures_relpath}/gamma_failures.png}}
-\end{{tabular}}%
-\begin{{tabular}}{{c}}
-  \includegraphics[width=.20\linewidth]{{{figures_relpath}/gamma_index_with_colorbar.png}} \\[1pt]
-  \includegraphics[width=.20\linewidth]{{{figures_relpath}/registration_nocolorbar.png}} \\
-\end{{tabular}}\\[2pt]
-\begin{{tabular}}{{c}}
-  \includegraphics[width=.35\linewidth]{{{figures_relpath}/measured_with_colorbar.png}}
-\end{{tabular}}%
-\begin{{tabular}}{{c}}
-  \includegraphics[width=.35\linewidth]{{{figures_relpath}/reference_with_colorbar.png}}
-\end{{tabular}}
-\end{{center}}
+\begin{{figure}}[h!]
+  \centering
+  \begin{{tabular}}{{c}}
+    \includegraphics[width=.52\linewidth]{{{figures_relpath}/gamma_failures.png}}
+  \end{{tabular}}%
+  \begin{{tabular}}{{c}}
+    \includegraphics[width=.26\linewidth]{{{figures_relpath}/gamma_index_with_colorbar.png}} \\
+    \includegraphics[width=.26\linewidth]{{{figures_relpath}/registration_nocolorbar.png}} \\
+  \end{{tabular}}
+  \begin{{tabular}}{{c}}
+    \includegraphics[width=.38\linewidth]{{{figures_relpath}/measured_with_colorbar.png}}
+  \end{{tabular}}%
+  \begin{{tabular}}{{c}}
+    \includegraphics[width=.38\linewidth]{{{figures_relpath}/reference_with_colorbar.png}}
+  \end{{tabular}}
+\end{{figure}}
 """
     return content
 
@@ -320,16 +321,16 @@ def generate_report(
     """
     Render or append a tested-case page to the SAR Pattern Validation report.
 
-    On the first call (no existing main.tex in *output_dir*), the base report
-    template is copied into *output_dir* and the first test case is inserted
-    into the appendix.
+    On the first call (no existing main.tex in *output_dir*), the
+    tested_case_report_page_new template is copied into *output_dir* and the
+    first test case is inserted before \\end{document}.
 
     On subsequent calls (main.tex already exists), the new test case is
-    appended to the existing appendix.
+    appended before \\end{document}.
 
     When ``compile_pdf=True`` (default) and ``pdflatex`` is on PATH, compiles
-    the .tex to PDF (two passes) and returns the PDF path.  If pdflatex is
-    absent the .tex path is returned instead (graceful degradation).
+    the .tex to PDF and returns the PDF path.  If pdflatex is absent the .tex
+    path is returned instead (graceful degradation).
 
     Returns the path to the compiled PDF, or to ``main.tex`` when PDF
     compilation is unavailable.
@@ -340,9 +341,9 @@ def generate_report(
 
     out_path = output_dir / "main.tex"
 
-    # --- Initialize from base_report if this is the first run ---
+    # --- Initialize from tested_case_report_page_new if this is the first run ---
     if not out_path.is_file():
-        _initialize_base_report(output_dir, template_dir)
+        _initialize_report(output_dir, template_dir)
 
     # --- Determine case number and create figures directory ---
     case_num = _next_case_number(output_dir)
@@ -368,16 +369,16 @@ def generate_report(
         figures_relpath=figures_relpath,
     )
 
-    # --- Insert the test case before \end{appendix} in main.tex ---
+    # --- Insert the test case before \end{document} in main.tex ---
     text = out_path.read_text(encoding="utf-8")
-    if _APPENDIX_END_MARKER not in text:
+    if _DOCUMENT_END_MARKER not in text:
         raise ValueError(
-            f"Cannot find '{_APPENDIX_END_MARKER}' in {out_path}. "
-            "The base report template may be malformed."
+            f"Cannot find '{_DOCUMENT_END_MARKER}' in {out_path}. "
+            "The report template may be malformed."
         )
     text = text.replace(
-        _APPENDIX_END_MARKER,
-        test_case_content + "\n" + _APPENDIX_END_MARKER,
+        _DOCUMENT_END_MARKER,
+        test_case_content + "\n" + _DOCUMENT_END_MARKER,
     )
     out_path.write_text(text, encoding="utf-8")
 

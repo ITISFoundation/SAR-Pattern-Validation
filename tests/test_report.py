@@ -68,14 +68,11 @@ def test_set_latex_macro_no_match_keeps_text_unchanged():
 
 def test_default_template_dir_resolves_to_repo_template():
     assert DEFAULT_TEMPLATE_DIR.name == "report_template"
-    assert (DEFAULT_TEMPLATE_DIR / "base_report" / "main.tex").is_file()
-    assert (DEFAULT_TEMPLATE_DIR / "tested_case_report_page" / "main.tex").is_file()
+    assert (DEFAULT_TEMPLATE_DIR / "main.tex").is_file()
 
 
 def test_template_figure_mapping_keys_match_tested_case_template():
-    template_text = (
-        DEFAULT_TEMPLATE_DIR / "tested_case_report_page" / "main.tex"
-    ).read_text(encoding="utf-8")
+    template_text = (DEFAULT_TEMPLATE_DIR / "main.tex").read_text(encoding="utf-8")
     for figure_name in TEMPLATE_FIGURE_MAPPING:
         assert f"figures/{figure_name}" in template_text, (
             f"Template no longer references {figure_name!r}; update the mapping."
@@ -116,11 +113,10 @@ def test_generate_report_writes_filled_tex_with_all_substitutions(tmp_path: Path
     assert "-0.35" in text  # scaling error
     assert r"2~mm" in text  # delta dist
     assert r"5~\%" in text  # delta dose
-    # Check it's inside the appendix
-    assert r"\section{Tested Cases}" in text
-    assert r"\end{appendix}" in text
-    # Check pass rate conditional: 97.5 < 100 so it should say Fail
-    assert r"\textbf{Fail}" in text
+    # Check it ends with \end{document}
+    assert r"\end{document}" in text
+    # Check pass rate conditional: 97.5 < 100 so it should say "fails"
+    assert "pattern validation fails" in text
 
 
 def test_generate_report_copies_existing_figures_with_template_filenames(
@@ -156,7 +152,7 @@ def test_generate_report_copies_existing_figures_with_template_filenames(
         compile_pdf=False,
     )
 
-    case_figures_dir = out_dir / "figures" / "case_001"
+    case_figures_dir = out_dir / "figures" / "case_000"
     for figure_name in TEMPLATE_FIGURE_MAPPING:
         assert (case_figures_dir / figure_name).is_file(), (
             f"Missing template figure {figure_name!r} in report output"
@@ -179,7 +175,7 @@ def test_generate_report_skips_missing_figures_without_failing(tmp_path: Path):
     )
 
     assert out.is_file()
-    case_figures_dir = tmp_path / "figures" / "case_001"
+    case_figures_dir = tmp_path / "figures" / "case_000"
     assert case_figures_dir.is_dir()
     assert list(case_figures_dir.iterdir()) == []
 
@@ -213,7 +209,7 @@ def test_compile_report_returns_none_when_pdflatex_missing(tmp_path: Path):
 
 
 def test_compile_report_produces_pdf(tmp_path: Path):
-    """End-to-end: compile the real base_report template."""
+    """End-to-end: compile the tested_case_report_page_new template."""
     import shutil as _shutil
 
     if not _shutil.which("pdflatex"):
@@ -222,11 +218,12 @@ def test_compile_report_produces_pdf(tmp_path: Path):
     out_dir = tmp_path / "report"
     out_dir.mkdir()
 
-    base_report_dir = DEFAULT_TEMPLATE_DIR / "base_report"
-    _shutil.copy2(base_report_dir / "main.tex", out_dir / "main.tex")
-    _shutil.copy2(base_report_dir / "bib.bib", out_dir / "bib.bib")
-    _shutil.copytree(base_report_dir / "class", out_dir / "class")
-    _shutil.copytree(base_report_dir / "figs", out_dir / "figs")
+    _shutil.copy2(DEFAULT_TEMPLATE_DIR / "main.tex", out_dir / "main.tex")
+
+    pdf = compile_report(out_dir / "main.tex")
+    assert pdf is not None
+    assert pdf.suffix == ".pdf"
+    assert pdf.stat().st_size > 1000
 
     pdf = compile_report(out_dir / "main.tex")
     assert pdf is not None
@@ -249,7 +246,7 @@ def test_generate_report_returns_pdf_when_compile_enabled(tmp_path: Path):
     figures_dir = tmp_path / "plots"
     figures_dir.mkdir()
     fake_figs = {}
-    tested_case_figs = DEFAULT_TEMPLATE_DIR / "tested_case_report_page" / "figures"
+    tested_case_figs = DEFAULT_TEMPLATE_DIR / "figures"
     for name in TEMPLATE_FIGURE_MAPPING:
         src = tested_case_figs / name
         dest = figures_dir / name
@@ -309,11 +306,13 @@ def test_generate_report_appends_multiple_cases(tmp_path: Path):
     )
 
     text = (out_dir / "main.tex").read_text(encoding="utf-8")
-    # Both subsection titles should be present
-    assert r"Dipole, 900\,MHz, 15\,mm, 10\,g" in text
-    assert r"Patch, 2450\,MHz, 10\,mm, 10\,g" in text
+    # Both case titles should be present
+    assert "dipole" in text
+    assert "patch" in text
+    assert "900" in text
+    assert "2450" in text
     # Two case directories should exist
+    assert (out_dir / "figures" / "case_000").is_dir()
     assert (out_dir / "figures" / "case_001").is_dir()
-    assert (out_dir / "figures" / "case_002").is_dir()
-    # Only one \end{appendix} marker
-    assert text.count(r"\end{appendix}") == 1
+    # Only one \end{document} marker
+    assert text.count(r"\end{document}") == 1
