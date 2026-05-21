@@ -166,8 +166,8 @@ def test_main_appends_to_existing_report(
     assert text.count(r"\end{document}") == 1
 
     # Two case figure directories
+    assert (output_dir / "figures" / "case_000").is_dir()
     assert (output_dir / "figures" / "case_001").is_dir()
-    assert (output_dir / "figures" / "case_002").is_dir()
 
 
 def test_main_returns_error_on_missing_json(tmp_path: Path, capsys):

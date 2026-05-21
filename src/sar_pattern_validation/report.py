@@ -1,15 +1,10 @@
 """
 Generate SAR Pattern Validation reports from workflow results.
 
-The report uses a two-level template structure:
-  - base_report/main.tex: the full validation report with an appendix
-    section "Tested Cases" where individual test-case pages are appended.
-  - tested_case_report_page/main.tex: a per-run template that is filled in
-    and inserted as a subsection for each workflow execution.
-
-On the first workflow run the base report is initialized into the output
-directory.  Subsequent runs append additional subsections to the existing
-main.tex in the same output directory.
+The report uses tested_case_report_page_new/main.tex as a standalone template.
+On the first workflow run the template main.tex is copied into the output
+directory.  Subsequent runs append additional test-case pages before the
+\\end{document} marker in the same output directory.
 
 Output path is exposed for [[Task 6.10 - User Report Download Button]] (MEST).
 """
@@ -39,8 +34,8 @@ TEMPLATE_FIGURE_MAPPING: dict[str, str] = {
     "reference_with_colorbar.png": "reference_image_path",
 }
 
-# Marker in the base_report main.tex where test-case content is inserted.
-_APPENDIX_END_MARKER = r"\end{appendix}"
+# Marker in main.tex where test-case content is inserted.
+_DOCUMENT_END_MARKER = r"\end{document}"
 
 
 def _set_latex_macro(text: str, name: str, value: str) -> str:
@@ -152,58 +147,46 @@ def _run_latex_cmd(cmd: list[str], cwd: Path, label: str) -> bool:
     return True
 
 
-def _initialize_base_report(output_dir: Path, template_dir: Path) -> None:
+def _initialize_report(output_dir: Path, template_dir: Path) -> None:
     """
-    Copy the base_report template into *output_dir* for the first workflow run.
+    Copy the report template into *output_dir* for the first workflow run.
 
-    Copies main.tex, bib.bib, class/, and figs/ so the report compiles
-    standalone from the output directory.
+    Only the package imports are kept; the sample macro definitions and document
+    body are stripped because the Python-rendered test cases provide all content
+    with values resolved inline.
     """
-    base_report_dir = template_dir / "base_report"
-    if not base_report_dir.is_dir():
-        raise FileNotFoundError(
-            f"Base report template directory not found: {base_report_dir}"
-        )
+    template_file = template_dir / "main.tex"
+    if not template_file.is_file():
+        raise FileNotFoundError(f"Report template not found: {template_file}")
 
-    # Copy main.tex
-    shutil.copy2(base_report_dir / "main.tex", output_dir / "main.tex")
+    template_text = template_file.read_text(encoding="utf-8")
 
-    # Copy bib and bst files
-    bib_src = base_report_dir / "bib.bib"
-    if bib_src.is_file():
-        shutil.copy2(bib_src, output_dir / "bib.bib")
-    bst_src = base_report_dir / "IEEE.bst"
-    if bst_src.is_file():
-        shutil.copy2(bst_src, output_dir / "IEEE.bst")
+    # Extract only the package/setup lines (up to "% input variables" comment
+    # or to \begin{document}), then write a minimal document shell.
+    lines = template_text.splitlines(keepends=True)
+    preamble_lines: list[str] = []
+    for line in lines:
+        # Stop before sample variable definitions
+        if line.strip().startswith("% input variables"):
+            break
+        preamble_lines.append(line)
 
-    # Copy class/ directory
-    class_src = base_report_dir / "class"
-    class_dst = output_dir / "class"
-    if class_src.is_dir():
-        if class_dst.exists():
-            shutil.rmtree(class_dst)
-        shutil.copytree(class_src, class_dst)
-
-    # Copy figs/ directory (static figures used in the base report)
-    figs_src = base_report_dir / "figs"
-    figs_dst = output_dir / "figs"
-    if figs_src.is_dir():
-        if figs_dst.exists():
-            shutil.rmtree(figs_dst)
-        shutil.copytree(figs_src, figs_dst)
+    preamble = "".join(preamble_lines)
+    report_text = preamble + "\n\\begin{document}\n\\end{document}\n"
+    (output_dir / "main.tex").write_text(report_text, encoding="utf-8")
 
 
 def _next_case_number(output_dir: Path) -> int:
     """Determine the next case number by counting existing case_* figure dirs."""
     figures_dir = output_dir / "figures"
     if not figures_dir.is_dir():
-        return 1
+        return 0
     existing = sorted(
         d.name
         for d in figures_dir.iterdir()
         if d.is_dir() and d.name.startswith("case_")
     )
-    return len(existing) + 1
+    return len(existing)
 
 
 def _render_test_case_body(
@@ -341,7 +324,7 @@ def generate_report(
 
     # --- Initialize from base_report if this is the first run ---
     if not out_path.is_file():
-        _initialize_base_report(output_dir, template_dir)
+        _initialize_report(output_dir, template_dir)
 
     # --- Determine case number and create figures directory ---
     case_num = _next_case_number(output_dir)
@@ -367,16 +350,16 @@ def generate_report(
         figures_relpath=figures_relpath,
     )
 
-    # --- Insert the test case before \end{appendix} in main.tex ---
+    # --- Insert the test case before \end{document} in main.tex ---
     text = out_path.read_text(encoding="utf-8")
-    if _APPENDIX_END_MARKER not in text:
+    if _DOCUMENT_END_MARKER not in text:
         raise ValueError(
-            f"Cannot find '{_APPENDIX_END_MARKER}' in {out_path}. "
-            "The base report template may be malformed."
+            f"Cannot find '{_DOCUMENT_END_MARKER}' in {out_path}. "
+            "The report template may be malformed."
         )
     text = text.replace(
-        _APPENDIX_END_MARKER,
-        test_case_content + "\n" + _APPENDIX_END_MARKER,
+        _DOCUMENT_END_MARKER,
+        test_case_content + "\n" + _DOCUMENT_END_MARKER,
     )
     out_path.write_text(text, encoding="utf-8")
 
