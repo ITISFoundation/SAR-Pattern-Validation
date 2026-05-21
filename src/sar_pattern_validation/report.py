@@ -235,6 +235,15 @@ def _render_test_case_body(
             r"$sSAR_{en}(x_e,y_e)$, compared to the reference, "
             r"$sSAR_{rn}(x'_r,y'_r)$,"
         )
+    err_scale_abs = abs(100.0 * workflow_result.scaling_error)
+    if err_scale_abs > 25.0:
+        scale_statement = (
+            r"The scaling error for the psSAR is outside the $\pm$~25.0~\% criteria."
+        )
+    else:
+        scale_statement = (
+            r"The scaling error for the psSAR is within the $\pm$~25.0~\% criteria."
+        )
     subsection_title = (
         f"{antenna_type.capitalize()}, {frequency_mhz}\\,MHz, "
         f"{distance_mm}\\,mm, {mass_g}\\,g"
@@ -265,7 +274,7 @@ File name with measurement, $sSAR_{{en}}(x_e,y_e)$: \texttt{{{measured_filename}
 \[
 \Gamma (x_e, y_e) = \min_{{x'_r,y'_r}}\Bigg(\sqrt{{\frac{{(x_e-x'_r)^2+(y_e-y'_r)^2}}{{\Delta d^2}}+\frac{{(sSAR_{{en}}(x_e,y_e)-sSAR_{{rn}}(x'_r,y'_r))^2}}{{\Delta D^2}}}}\Bigg)
 \]
-}} with $\Delta D = ${delta_dose}, $\Delta d$ = {delta_dist}. See IEC/IEEE PAS 62209-5 for details.
+}} with $\Delta D = ${delta_dose}, $\Delta d$ = {delta_dist}. See IEC/IEEE PAS 62209-5 for details. {scale_statement}
 
 \vspace{{-0.5em}}
 \begin{{center}}
