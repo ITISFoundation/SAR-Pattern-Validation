@@ -208,8 +208,18 @@ def _render_test_case_body(
     measured_filename = _latex_escape_filename(
         Path(workflow_config.measured_file_path).name
     )
-    power_level = f"{workflow_config.power_level_dbm:g}"
     noise_level = f"{workflow_config.noise_floor:g}"
+    measurement_area_x = (
+        f"{workflow_config.measurement_area_x_mm:g}"
+        if workflow_config.measurement_area_x_mm is not None
+        else "---"
+    )
+    measurement_area_y = (
+        f"{workflow_config.measurement_area_y_mm:g}"
+        if workflow_config.measurement_area_y_mm is not None
+        else "---"
+    )
+    pssar_measured = f"{workflow_result.measured_peak_wkg:.2f}"
     pssar_ref = f"{workflow_result.reference_pssar:.2f}"
     pssar_meas = f"{workflow_result.measured_pssar:.2f}"
     err_scale = f"{100.0 * workflow_result.scaling_error:.2f}"
@@ -220,78 +230,78 @@ def _render_test_case_body(
     # Resolve pass/fail conditional
     if pass_rate < 100.0:
         fail_rate = f"{100.0 - pass_rate:.1f}"
-        passfail = r"\textbf{Fail}"
-        statement = (
+        gamma_statement = (
             rf"The pattern validation fails because $\Gamma (x_e,y_e)~>~1.0$ "
-            rf"for {fail_rate}\,\% of the measured sSAR values, "
-            rf"$sSAR_{{en}}(x_e,y_e)$, compared to the reference, "
-            rf"$sSAR_{{rn}}(x'_r,y'_r)$,"
+            rf"at {fail_rate}\,\% of the locations of the measured sSAR "
+            rf"distribution compared to the reference, "
         )
     else:
-        passfail = r"\textbf{Pass}"
-        statement = (
+        gamma_statement = (
             r"The pattern validation passes because $\Gamma (x_e,y_e)~\leq~1.0$ "
-            r"for all of the measured sSAR values, "
-            r"$sSAR_{en}(x_e,y_e)$, compared to the reference, "
-            r"$sSAR_{rn}(x'_r,y'_r)$,"
+            r"at all locations of the measured sSAR distribution, "
+            r"compared to the reference, "
         )
+
+    # Scaling error statement
     err_scale_abs = abs(100.0 * workflow_result.scaling_error)
-    if err_scale_abs > 25.0:
+    err_scale_tolerance = "25.0"
+    if err_scale_abs > float(err_scale_tolerance):
         scale_statement = (
-            r"The scaling error for the psSAR is outside the $\pm$~25.0~\% criteria."
+            rf"The scaling error for the psSAR is outside the "
+            rf"$\pm$~{err_scale_tolerance}~\% criteria."
         )
     else:
         scale_statement = (
-            r"The scaling error for the psSAR is within the $\pm$~25.0~\% criteria."
+            rf"The scaling error for the psSAR is within the "
+            rf"$\pm$~{err_scale_tolerance}~\% criteria."
         )
-    subsection_title = (
-        f"{antenna_type.capitalize()}, {frequency_mhz}\\,MHz, "
-        f"{distance_mm}\\,mm, {mass_g}\\,g"
-    )
 
     # Build the LaTeX snippet for this test case
     content = rf"""
 \clearpage
 \FloatBarrier
-\subsection{{{subsection_title}}}
+\begin{{center}}
+    \section*{{SAR Pattern Assessment Report for IEC/IEEE PAS 62209-5}}
+    \today
+\end{{center}}
 
-File name with measurement, $sSAR_{{en}}(x_e,y_e)$: \texttt{{{measured_filename}}}
+\subsection*{{Measured sSAR Parameters}}
+
+File name: \texttt{{{measured_filename}}}\\
+Measurement area: ($x$, $y$) = ({measurement_area_x}~mm, {measurement_area_y}~mm).
 
 \begin{{table}}[htpb] \centering
-\begin{{tabular}}{{cccccc|ccc}}
-\textbf{{Power}} & \textbf{{Noise}} & \textbf{{Source}} &&& \textbf{{Avg.}}&\multicolumn{{2}}{{c}}{{\textbf{{psSAR at 30~dBm}}}}& \textbf{{Sampling}} \\
-\textbf{{Level}} & \textbf{{Level}} &\textbf{{Type}} & \textbf{{Freq.}} & \textbf{{Dist.}} & \textbf{{Mass}} & \textbf{{Measured}} & \textbf{{Reference}} & \textbf{{Error}} \\
-\textbf{{(dBm)}} & \textbf{{(W/kg)}} & & \textbf{{(MHz)}} & \textbf{{(mm)}} & \textbf{{(g)}} & \textbf{{(W/kg)}} & \textbf{{(W/kg)}} & \textbf{{(\%)}} \\\hline
-{power_level} & {noise_level} & {antenna_type} & {frequency_mhz} & {distance_mm} & {mass_g} & {pssar_meas} & {pssar_ref} & {err_scale} \\
+\begin{{tabular}}{{ccccc||cccc}}
+
+\textbf{{Source}} &\textbf{{Freq.}} & \textbf{{Dist.}} & \textbf{{Avg.}}& \textbf{{Noise}}& \textbf{{psSAR}} &\multicolumn{{2}}{{c}}{{\textbf{{psSAR at 30~dBm}}}}& \textbf{{Scaling}} \\
+\textbf{{Type}} & & & \textbf{{Mass}} & \textbf{{Floor}}& \textbf{{Meas.}}& \textbf{{Meas.}} & \textbf{{Ref.}} & \textbf{{Error}} \\
+& \textbf{{(MHz)}} & \textbf{{(mm)}} & \textbf{{(g)}} & \textbf{{(W/kg)}} &\textbf{{(W/kg)}} & \textbf{{(W/kg)}} & \textbf{{(W/kg)}} & \textbf{{(\%)}} \\\hline
+{antenna_type} & {frequency_mhz} & {distance_mm} & {mass_g} & {noise_level} & {pssar_measured} & {pssar_meas} & {pssar_ref} & {err_scale} \\
 \end{{tabular}}
 \end{{table}}
 
-\vspace{{-1em}}
 \FloatBarrier
-\subsubsection*{{Pattern Match Result: {passfail}}}
+\subsection*{{Results}}
 
-{statement} ~according to the Gamma criterion\footnote{{
-\[
-\Gamma (x_e, y_e) = \min_{{x'_r,y'_r}}\Bigg(\sqrt{{\frac{{(x_e-x'_r)^2+(y_e-y'_r)^2}}{{\Delta d^2}}+\frac{{(sSAR_{{en}}(x_e,y_e)-sSAR_{{rn}}(x'_r,y'_r))^2}}{{\Delta D^2}}}}\Bigg)
-\]
-}} with $\Delta D = ${delta_dose}, $\Delta d$ = {delta_dist}. See IEC/IEEE PAS 62209-5 for details. {scale_statement}
+{gamma_statement} ~according to the Gamma criterion described in IEC/IEEE PAS 62209-5
+with $\Delta D~=~${delta_dose}, $\Delta d$~=~{delta_dist}. {scale_statement}
 
-\vspace{{-0.5em}}
-\begin{{center}}
-\begin{{tabular}}{{c}}
-  \includegraphics[width=.42\linewidth]{{{figures_relpath}/gamma_failures.png}}
-\end{{tabular}}%
-\begin{{tabular}}{{c}}
-  \includegraphics[width=.20\linewidth]{{{figures_relpath}/gamma_index_with_colorbar.png}} \\[1pt]
-  \includegraphics[width=.20\linewidth]{{{figures_relpath}/registration_nocolorbar.png}} \\
-\end{{tabular}}\\[2pt]
-\begin{{tabular}}{{c}}
-  \includegraphics[width=.35\linewidth]{{{figures_relpath}/measured_with_colorbar.png}}
-\end{{tabular}}%
-\begin{{tabular}}{{c}}
-  \includegraphics[width=.35\linewidth]{{{figures_relpath}/reference_with_colorbar.png}}
-\end{{tabular}}
-\end{{center}}
+\begin{{figure}}[h!]
+  \centering
+  \begin{{tabular}}{{c}}
+    \includegraphics[width=.52\linewidth]{{{figures_relpath}/gamma_failures.png}}
+  \end{{tabular}}%
+  \begin{{tabular}}{{c}}
+    \includegraphics[width=.26\linewidth]{{{figures_relpath}/gamma_index_with_colorbar.png}} \\
+    \includegraphics[width=.26\linewidth]{{{figures_relpath}/registration_nocolorbar.png}} \\
+  \end{{tabular}}
+  \begin{{tabular}}{{c}}
+    \includegraphics[width=.38\linewidth]{{{figures_relpath}/measured_with_colorbar.png}}
+  \end{{tabular}}%
+  \begin{{tabular}}{{c}}
+    \includegraphics[width=.38\linewidth]{{{figures_relpath}/reference_with_colorbar.png}}
+  \end{{tabular}}
+\end{{figure}}
 """
     return content
 
@@ -311,16 +321,16 @@ def generate_report(
     """
     Render or append a tested-case page to the SAR Pattern Validation report.
 
-    On the first call (no existing main.tex in *output_dir*), the base report
-    template is copied into *output_dir* and the first test case is inserted
-    into the appendix.
+    On the first call (no existing main.tex in *output_dir*), the
+    tested_case_report_page_new template is copied into *output_dir* and the
+    first test case is inserted before \\end{document}.
 
     On subsequent calls (main.tex already exists), the new test case is
-    appended to the existing appendix.
+    appended before \\end{document}.
 
     When ``compile_pdf=True`` (default) and ``pdflatex`` is on PATH, compiles
-    the .tex to PDF (two passes) and returns the PDF path.  If pdflatex is
-    absent the .tex path is returned instead (graceful degradation).
+    the .tex to PDF and returns the PDF path.  If pdflatex is absent the .tex
+    path is returned instead (graceful degradation).
 
     Returns the path to the compiled PDF, or to ``main.tex`` when PDF
     compilation is unavailable.
@@ -331,7 +341,7 @@ def generate_report(
 
     out_path = output_dir / "main.tex"
 
-    # --- Initialize from base_report if this is the first run ---
+    # --- Initialize from tested_case_report_page_new if this is the first run ---
     if not out_path.is_file():
         _initialize_report(output_dir, template_dir)
 

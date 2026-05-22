@@ -209,7 +209,7 @@ def test_compile_report_returns_none_when_pdflatex_missing(tmp_path: Path):
 
 
 def test_compile_report_produces_pdf(tmp_path: Path):
-    """End-to-end: compile_report produces a non-empty PDF from a valid .tex."""
+    """End-to-end: compile the tested_case_report_page_new template."""
     import shutil as _shutil
 
     if not _shutil.which("pdflatex"):
@@ -217,18 +217,15 @@ def test_compile_report_produces_pdf(tmp_path: Path):
 
     out_dir = tmp_path / "report"
     out_dir.mkdir()
-    tex = out_dir / "main.tex"
-    tex.write_text(
-        r"\documentclass{article}\begin{document}hello\end{document}",
-        encoding="utf-8",
-    )
 
-    pdf = compile_report(tex)
+    _shutil.copy2(DEFAULT_TEMPLATE_DIR / "main.tex", out_dir / "main.tex")
+
+    pdf = compile_report(out_dir / "main.tex")
     assert pdf is not None
     assert pdf.suffix == ".pdf"
     assert pdf.stat().st_size > 1000
 
-    pdf = compile_report(tex)
+    pdf = compile_report(out_dir / "main.tex")
     assert pdf is not None
     assert pdf.suffix == ".pdf"
     assert pdf.stat().st_size > 1000
