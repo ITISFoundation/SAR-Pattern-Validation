@@ -8,15 +8,13 @@
 \usepackage{subcaption}
 \usepackage{placeins}
 \usepackage{xspace}
-\IfFileExists{datetime.sty}{%
-  \usepackage[us,24hr]{datetime}%
-}{}
-\IfFileExists{helvet.sty}{%
-  \usepackage{helvet}%
-  \renewcommand{\familydefault}{\sfdefault}%
-}{}
+\usepackage[us,24hr]{datetime}
+% \usepackage{helvet}
+% \renewcommand{\familydefault}{\sfdefault}
 \usepackage{fp}
 \usepackage{footnote}
+\usepackage{ifthen}
+\usepackage{pgf}
 \makesavenoteenv{tabular}
 
 % input variables
@@ -28,6 +26,16 @@
 \newcommand{\distance}{10} % mm
 \newcommand{\mass}{10}  % grams
 \newcommand{\powerlevel}{16.5} % dBm
+
+\newcommand{\uncantenna}{}  % percent
+\ifthenelse{\equal{\antennatype}{VPIFA}}{%
+  \renewcommand{\uncantenna}{14.3}%
+}{%
+  \renewcommand{\uncantenna}{9.4}%
+}
+
+\pgfmathsetmacro{\scaletolerance}{sqrt(0.25^2 + (\uncantenna/100)^2)}
+\FPeval{\scaletol}{round(100*\scaletolerance, 1)}
 
 \newcommand{\pssarref}{24.71}  % W/kg
 \newcommand{\pssarmeas}{1.31} % W/kg
@@ -53,10 +61,11 @@
     \newcommand{\gammastatement}{The pattern validation passes because $\Gamma (x_e,y_e)~\leq~1.0$ at all locations of the measured sSAR distribution, compared to the reference, }
 \fi
 
+\newcommand{\scalestatementpost}{the tolerance of $\pm~\sqrt{\errscaletolerance~\%^2 + U_{r,m}^2} = \scaletol~\%$, where $U_{r,m}^2$ = \uncantenna~\% ~for this antenna}
 \FPifgt{\errscaleabs}{\errscaletolerance}%
-    \newcommand{\scalestatement}{The scaling error for the psSAR is outside the $\pm$~\errscaletolerance~\% criteria.}
+    \newcommand{\scalestatement}{The scaling error for the psSAR is outside \scalestatementpost.}
 \else
-    \newcommand{\scalestatement}{The scaling error for the psSAR is within the $\pm$~\errscaletolerance~\% criteria.}
+    \newcommand{\scalestatement}{The scaling error for the psSAR is within \scalestatementpost.}
 \fi
 
 \title{SAR Pattern Validation Report}
@@ -88,7 +97,8 @@ Measurement area: ($x$, $y$) = (\measx~mm, \measy~mm).
 \subsection*{Results}
 
 \gammastatement ~according to the Gamma criterion described in IEC/IEEE PAS 62209-5
-with $\Delta D~=~$\deltadose, $\Delta d$~=~\deltadist. \scalestatement
+with $\Delta D~=~$\deltadose, $\Delta d$~=~\deltadist.
+\scalestatement
 
 \begin{figure}[h!]
   \centering
@@ -108,3 +118,31 @@ with $\Delta D~=~$\deltadose, $\Delta d$~=~\deltadist. \scalestatement
   % \caption*{}
 \end{figure}
 \end{document}
+
+% \maketitle
+% \thispagestyle{empty}
+
+% \section*{Background}
+
+% This report documents the validation of a measured spatially-averaged SAR (sSAR) pattern compared to a reference distribution. A reference software implementation is provided, where a measured sSAR distribution is uploaded and the input parameters are chosen (antenna type, frequency, distance, and averaging mass). The software evaluates the Gamma match and determines whether the sSAR distribution is compliant, according to the criteria. The software also creates plots to show the measured and reference SAR distributions, the registration overlay, the gamma index map and the pass/fail map.
+
+% Validation of spatial SAR distributions is performed using the Gamma method developed by Low and Dempsey~\cite{low-dempsey} to compare measured spatial SAR distributions, $sSAR_{en}(x_e,y_e)$, with corresponding reference distributions, $sSAR_{rn}(x_r,y_r)$, each normalized to its peak value. The Gamma method combines two criteria, SAR magnitude difference and spatial distance-to-agreement, combining these two dimensions (after normalization by their respective tolerances $\Delta D$ and $\Delta d$) into a single Euclidian distance norm, $\Gamma$, which is used to identify corresponding points:
+
+
+% $sSARen(x_e,y_e)$ and $sSARrn(x_r,y_r)$ are both extracted at the boundary between the phantom shell and lossy medium. Before normalization, masking is performed to select only those values above 0.1 W/kg or twice the noise floor of the system, whichever is lower. A rigid transformation is first applied to the reference coordinates ($x_r$, $y_r$) to get the registered reference coordinates ($x'_r$, $y'_r$) on a 1~mm regular grid that optimally matches the evaluated distribution to the reference distribution. For each point ($x_e$, $y_e$) on $sSAR_{en}$, all points ($x'_r$, $y'_r$) are searched to identify the corresponding point with the minimal Gamma index. The validation is considered successful if $\Gamma (x_e,y_e)~\leq~1.0$ for all points.
+
+% \bibliographystyle{ieeetr}
+% \bibliography{sample}
+
+% \FloatBarrier
+% \clearpage
+% \newpage
+
+% \begin{table}[htpb] \centering
+% \begin{tabular}{cc|cc}
+% \multicolumn{2}{c|}{\textbf{Output}} & \multicolumn{2}{c}{\textbf{Gamma Parameters}} \\
+% \textbf{Result} & \textbf{Pass Rate (\%)} & \boldmath{$\Delta D$} & \boldmath{$\Delta d$} \\\hline
+% \passfail & \passrate & \deltadose & \deltadist \\
+% \end{tabular}
+% \label{tab:meas-params}
+% \end{table}

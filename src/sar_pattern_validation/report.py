@@ -38,6 +38,25 @@ TEMPLATE_FIGURE_MAPPING: dict[str, str] = {
 _DOCUMENT_END_MARKER = r"\end{document}"
 
 
+def _auto_measurement_area_mm(measured_csv_path: str | Path) -> tuple[float, float]:
+    """
+    Return (x_extent_mm, y_extent_mm) of the measured CSV's coordinate grid.
+
+    Used as the report fallback when no explicit measurement area was supplied:
+    the workflow processes the full extent of the measured grid in that case,
+    so we mirror that here. ``SARImageLoader._read_csv`` normalises x/y to
+    meters regardless of the original header units.
+    """
+    # Local import to avoid pulling SimpleITK at module import time for callers
+    # that only need the public report API surface.
+    from sar_pattern_validation.image_loader import SARImageLoader
+
+    df = SARImageLoader._read_csv(str(measured_csv_path))
+    x_mm = float((df["x_m"].max() - df["x_m"].min()) * 1000.0)
+    y_mm = float((df["y_m"].max() - df["y_m"].min()) * 1000.0)
+    return x_mm, y_mm
+
+
 def _set_latex_macro(text: str, name: str, value: str) -> str:
     """
     Substitute the body of a LaTeX macro definition. Handles both
@@ -209,16 +228,30 @@ def _render_test_case_body(
         Path(workflow_config.measured_file_path).name
     )
     noise_level = f"{workflow_config.noise_floor:g}"
-    measurement_area_x = (
-        f"{workflow_config.measurement_area_x_mm:g}"
-        if workflow_config.measurement_area_x_mm is not None
-        else "---"
-    )
-    measurement_area_y = (
-        f"{workflow_config.measurement_area_y_mm:g}"
-        if workflow_config.measurement_area_y_mm is not None
-        else "---"
-    )
+    # Resolve the measurement area written to the report. If the GUI/CLI
+    # supplied explicit dimensions, use them. Otherwise fall back to the
+    # auto-detected extent of the measured CSV (max-min of x/y, in mm) so
+    # the report reflects the actual area the workflow processed instead of
+    # showing dashes.
+    area_x_mm = workflow_config.measurement_area_x_mm
+    area_y_mm = workflow_config.measurement_area_y_mm
+    if area_x_mm is None or area_y_mm is None:
+        try:
+            auto_x_mm, auto_y_mm = _auto_measurement_area_mm(
+                workflow_config.measured_file_path
+            )
+            if area_x_mm is None:
+                area_x_mm = auto_x_mm
+            if area_y_mm is None:
+                area_y_mm = auto_y_mm
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            LOGGER.warning(
+                "Could not auto-derive measurement area from %s: %s",
+                workflow_config.measured_file_path,
+                exc,
+            )
+    measurement_area_x = f"{area_x_mm:g}" if area_x_mm is not None else "---"
+    measurement_area_y = f"{area_y_mm:g}" if area_y_mm is not None else "---"
     pssar_measured = f"{workflow_result.measured_peak_wkg:.2f}"
     pssar_ref = f"{workflow_result.reference_pssar:.2f}"
     pssar_meas = f"{workflow_result.measured_pssar:.2f}"
@@ -242,18 +275,29 @@ def _render_test_case_body(
             r"compared to the reference, "
         )
 
-    # Scaling error statement
+    # Scaling error statement.
+    # u_mr (antenna measurement uncertainty, in %) and pssar_criteria
+    # (combined tolerance, in %) are computed here using the same formulas
+    # as the Voila GUI (see voila.ipynb::_update_analytical_results).
     err_scale_abs = abs(100.0 * workflow_result.scaling_error)
+    u_mr = 14.3 if antenna_type.upper() == "VPIFAS" else 9.4
+    dose_da = float(workflow_result.dose_to_agreement)
+    pssar_criteria = ((30.0 - dose_da) ** 2 + u_mr**2) ** 0.5
+    pssar_criteria_str = f"{pssar_criteria:.1f}"
+    u_mr_str = f"{u_mr:g}"
     err_scale_tolerance = "25.0"
-    if err_scale_abs > float(err_scale_tolerance):
+    scale_statement_post = (
+        rf"the tolerance of $\pm~\sqrt{{{err_scale_tolerance}~\%^2 + U_{{r,m}}^2}} "
+        rf"= {pssar_criteria_str}~\%$, where $U_{{r,m}}^2$ = {u_mr_str}~\% "
+        rf"for this antenna"
+    )
+    if err_scale_abs > pssar_criteria:
         scale_statement = (
-            rf"The scaling error for the psSAR is outside the "
-            rf"$\pm$~{err_scale_tolerance}~\% criteria."
+            rf"The scaling error for the psSAR is outside {scale_statement_post}."
         )
     else:
         scale_statement = (
-            rf"The scaling error for the psSAR is within the "
-            rf"$\pm$~{err_scale_tolerance}~\% criteria."
+            rf"The scaling error for the psSAR is within {scale_statement_post}."
         )
 
     # Build the LaTeX snippet for this test case
