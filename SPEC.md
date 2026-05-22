@@ -116,7 +116,15 @@ V19: when `measurement_area_x_mm` and `measurement_area_y_mm` are specified, the
 
 V20: `noise_floor = 0.0` is a valid input meaning "no noise filtering — all support pixels participate in gamma evaluation"; `WorkflowSchema.noise_floor` must accept `ge=0` (not `gt=0`). `SARImageLoader` already handles zero correctly (`cutoff_wkg = 0`, all-support mask). Gate: schema-level test `test_workflow_schema_accepts_zero_noise_floor`.
 
-V21: overlay legends in Rigid Registration Overlay and Gamma Pass/Fail Map must use `fontsize=7`, `framealpha=0.0`, and label "Noise" (not "Below noise floor") for the noise-floor patch. Reduces overlap with measurement area in tight plots. Locus: `plotting.py:_apply_overlay_legend`, `plotting.py:plot_gamma_results`.
+V21: overlay legends in Rigid Registration Overlay and Gamma Pass/Fail Map must use `fontsize=9`, `framealpha=0.0`, and label "Noise" (not "Below noise floor") for the noise-floor patch. Reduces overlap with measurement area in tight plots. Locus: `plotting.py:_apply_overlay_legend`, `plotting.py:plot_gamma_results`.
+
+V22: `SARImageLoader.plot` must pass `reference_noise_floor_mask=None` to `plot_loaded_images` and `noise_floor_mask=None` to `plot_sar_image` for the reference standalone image. The reference phantom model has no measurement noise floor — only measured-side plots may show noise-floor graying. Locus: `image_loader.py:500,549`.
+
+V23: The psSAR "Criteria [%]" HTML cell in `_update_analytical_results` (notebook cell 11) must display `≤ ± 25` to match the V18 threshold. Display string and threshold logic must stay in sync. Locus: `voila.ipynb` cell 11 `_update_analytical_results`, string `&le; &plusmn; 10`.
+
+V24: MASK_TOO_SMALL error message must read: "The valid measurement region is too small after noise filtering. It does not contain a 50 mm × 50 mm axis-aligned inscribed square. The pattern comparison will not be performed." — no mention of noise floor as a user parameter; `DEFAULT_MIN_INSCRIBED_SQUARE_MM` must equal 50. Locus: `workflow_config.py:DEFAULT_MIN_INSCRIBED_SQUARE_MM`, `workflows.py:301-304,409-412`.
+
+V25: When MASK_TOO_SMALL is raised, `handle_button_click` must clear bottom-row panels and display the pre-registration Reference + Measured panels (top-left and top-middle). `complete_workflow` must save reference and measured standalone images before the mask validity check so they exist on failure. Locus: `handle_button_click` except block, new `update_images(partial=True)` mode, `complete_workflow` image-save order.
 
 ## §T Tasks
 
@@ -154,6 +162,11 @@ Stream C — GitHub issue tracker (branch `jgo/m6t4-gamma-excludes-noise-filtere
 | T18 | x | #12: center measurement area window on imported data midpoint rather than peak-SAR location — amend `image_loader.py:85-87` and V13 | V19 |
 | T19 | x | #13: allow noise_floor = 0 — change `WorkflowSchema.noise_floor` from `gt=0` to `ge=0`; zero means no noise filtering, all support pixels evaluated | V20 |
 | T20 | x | #14: reduce legend overlap — `fontsize=7`, `framealpha=0.0`, rename "Below noise floor" → "Noise" in `_apply_overlay_legend` and `plot_gamma_results` | V21 |
+| T21 | x | #5: pass `reference_noise_floor_mask=None` to `plot_loaded_images` and `noise_floor_mask=None` to `plot_sar_image` for reference standalone in `image_loader.py:500,549` | V22 |
+| T22 | x | #11 residual: change `&le; &plusmn; 10` → `&le; &plusmn; 25` in `_update_analytical_results` Criteria [%] cell | V23 |
+| T23 | x | #16: set `DEFAULT_MIN_INSCRIBED_SQUARE_MM = 50`; rewrite MASK_TOO_SMALL message at `workflows.py:301-304,409-412` to match V24 | V24 |
+| T24 | x | #15: save ref+measured images before mask check in `complete_workflow`; add `update_images(partial=True)` mode showing only top-left+top-middle; call in MASK_TOO_SMALL except path | V25 |
+| T25 | x | #17: set legend `fontsize=9` for all plot legend calls (Rigid Registration Overlay, Gamma Pass/Fail Map) — `plotting.py:_apply_overlay_legend`, `plot_gamma_results` | V21 |
 
 ## §M Merge Log
 
@@ -327,3 +340,7 @@ Stream E — Port from `jgo/feedback-changes`:
 | B17 | 2026-05-19 | measurement area window centered on peak-SAR location (`image_loader.py:86`, per V13) rather than the midpoint of the imported measured grid; when the measurement scan is asymmetric (peak near boundary), up to half the plot window shows empty space outside the actual scan range | V19 |
 | B18 | 2026-05-19 | `WorkflowSchema.noise_floor` declared `gt=0` (strictly positive) but the widget allows `min=0.0`; entering 0 and clicking Compare Patterns raises Pydantic `ValidationError` shown as a raw error banner — should silently mean "no noise filtering" | V20 |
 | B19 | 2026-05-19 | overlay legend in Rigid Registration Overlay and Gamma Pass/Fail Map uses `fontsize=9` and opaque frame (`framealpha` default ≈ 0.8), occupying too much space and overlapping the measurement area; label "Below noise floor" is verbose | V21 |
+| B20 | 2026-05-20 | `image_loader.py:500` passes `reference_noise_floor_mask=self._reference_noise_floor_mask` to `plot_loaded_images`, and `image_loader.py:549` passes `noise_floor_mask=self._reference_noise_floor_mask` to `plot_sar_image`; both apply reference noise-floor graying to the Reference, Normalized plot which should show only the antenna-support boundary | V22 |
+| B21 | 2026-05-20 | notebook cell 11 `_update_analytical_results` hardcodes `&le; &plusmn; 10` for the Criteria [%] cell; when V18 changed the threshold logic to 25 % the display string was not updated, so the table still reads "≤ ± 10" | V23 |
+| B22 | 2026-05-20 | MASK_TOO_SMALL message at `workflows.py:301-304,409-412` reads "22 mm × 22 mm" (`DEFAULT_MIN_INSCRIBED_SQUARE_MM = 22`, itself wrong — should be 50) and appends "try lowering the noise floor threshold" (the noise floor is a fixed hardware constraint, not a user variable) | V24 |
+| B23 | 2026-05-20 | `handle_button_click` except block catches MASK_TOO_SMALL and shows error banner but never calls `update_images`, leaving all six image panels populated with plots from the previous successful run; pre-registration ref+measured images (computed before the mask check) should be shown | V25 |

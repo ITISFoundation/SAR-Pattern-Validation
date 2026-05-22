@@ -25,9 +25,8 @@ DEFAULT_ADAPTIVE_MAX_STAGE_EVALS: Final[int] = 50000
 DEFAULT_LOG_LEVEL: Final[str] = "INFO"
 
 # Minimum axis-aligned physical square (mm) that must fit within the gamma
-# evaluation mask for the comparison to be considered valid. 22 mm = the
-# face of the 10 g averaging cube. Per MGD 2026-04-24 feedback, slide 7.
-DEFAULT_MIN_INSCRIBED_SQUARE_MM: Final[float] = 22.0
+# evaluation mask for the comparison to be considered valid. Per issue #16.
+DEFAULT_MIN_INSCRIBED_SQUARE_MM: Final[float] = 50.0
 DEFAULT_PLOT_WINDOW_MM: Final[tuple[float, float, float, float]] = (
     -120.0,
     120.0,
