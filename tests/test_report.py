@@ -219,6 +219,7 @@ def test_compile_report_produces_pdf(tmp_path: Path):
     out_dir.mkdir()
 
     _shutil.copy2(DEFAULT_TEMPLATE_DIR / "main.tex", out_dir / "main.tex")
+    _shutil.copytree(DEFAULT_TEMPLATE_DIR / "figures", out_dir / "figures")
 
     pdf = compile_report(out_dir / "main.tex")
     assert pdf is not None
